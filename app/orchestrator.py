@@ -113,7 +113,8 @@ class KitchenOrchestrator:
                 break
             
             # If tool used, execute and continue
-            self.history[session_id].append({"role": "assistant", "content": response_text or "Executing task..."}) # Placeholder for tool usage block in history
+            # Note: In a real streaming scenario, we might want to handle text + tool usage carefully
+            self.history[session_id].append({"role": "assistant", "content": response_text or "Executing task..."})
             
             for tool in tool_uses:
                 result = await self._execute_tool(session_id, tool.name, tool.input)
@@ -127,4 +128,3 @@ class KitchenOrchestrator:
                         }
                     ]
                 })
-            # Loop continues to let Claude respond to tool results
