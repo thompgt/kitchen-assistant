@@ -12,3 +12,7 @@ httpx
 cartesia
 elevenlabs
 websockets
+duckdb
+pandas
+nbconvert
+ipykernel
