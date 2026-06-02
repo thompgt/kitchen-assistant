@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-pydantic
+pydantic[email]
 redis
 python-dotenv
 anthropic
@@ -9,3 +9,6 @@ openai
 pytest
 pytest-asyncio
 httpx
+cartesia
+elevenlabs
+websockets
