@@ -1,40 +1,29 @@
 import os
-from cartesia import Cartesia
-from dotenv import load_dotenv
+import asyncio
 from typing import AsyncGenerator
+import google.generativeai as genai
+from dotenv import load_dotenv
 
 load_dotenv()
 
-class CartesiaTTS:
+class GoogleTTS:
     def __init__(self):
-        self.client = Cartesia(api_key=os.getenv("CARTESIA_API_KEY"))
-        self.voice_id = "a0e69980-6b4d-424d-916c-a337c1a83e6b" # Example: British Chef or professional voice
-        self.model_id = "sonic-english"
-        self.output_format = {
-            "container": "raw",
-            "encoding": "pcm_s16le",
-            "sample_rate": 16000,
-        }
+        # Note: Google's Generative AI SDK (Gemini) doesn't have a direct "stream speech" method 
+        # like Cartesia. For a true voice assistant, we usually use Google Cloud Text-to-Speech.
+        # However, we can use Gemini 1.5's multimodal capabilities if available, or fallback 
+        # to a standard async wrapper for Cloud TTS.
+        self.api_key = os.getenv("GOOGLE_API_KEY")
+        genai.configure(api_key=self.api_key)
+        # Using a simplified mock/placeholder since Gemini SDK is primarily LLM-focused.
+        # In a production app, we would use 'google-cloud-texttospeech'.
+        pass
 
     async def stream_speech(self, text_stream: AsyncGenerator[str, None]) -> AsyncGenerator[bytes, None]:
         """
-        Pipes a text stream into Cartesia and yields binary audio chunks.
+        Processes text tokens and yields audio bytes.
+        Placeholder implementation: In Phase 6, we will integrate Google Cloud TTS.
         """
-        # Create a streaming context
-        ctx = self.client.tts.websocket()
-        
-        # We need to handle the streaming bi-directionally
-        # Cartesia's SDK usually handles the websocket under the hood
-        try:
-            output = ctx.send(
-                model_id=self.model_id,
-                voice_id=self.voice_id,
-                transcript=text_stream,
-                output_format=self.output_format,
-                stream=True
-            )
-
-            for chunk in output:
-                yield chunk["audio"]
-        finally:
-            ctx.close()
+        async for text in text_stream:
+            # Placeholder: Returning simulated audio bytes or the text itself for debug
+            # Real implementation would use Google Cloud TTS Streaming API
+            yield f"[AUDIO: {text}]".encode()
