@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from .state_manager import state_manager
 from .models import RecipeState
+from .orchestrator_v2 import KitchenOrchestrator
 
 load_dotenv()
 
@@ -14,6 +15,8 @@ app = FastAPI(
     version="0.1.0"
 )
 
+orchestrator = KitchenOrchestrator()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,6 +24,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.websocket("/ws/voice/{session_id}")
+async def voice_websocket(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    print(f"WebSocket connected for session: {session_id}")
+    try:
+        await orchestrator.handle_voice_session(websocket)
+    except WebSocketDisconnect:
+        print(f"WebSocket disconnected for session: {session_id}")
+    except Exception as e:
+        print(f"WebSocket error for session {session_id}: {e}")
 
 @app.get("/health")
 async def health_check():
