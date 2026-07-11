@@ -1,21 +1,24 @@
+import logging
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from dotenv import load_dotenv
 
+from .live.gateway import LiveGateway
 from .state_manager import state_manager
-from .schemas import RecipeState
-from .orchestrator_v2 import KitchenOrchestrator
+from .tools.registry import ToolRegistry
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Kitchen Assistant API",
     description="Real-time voice agent for high-noise kitchen environments",
-    version="0.1.0"
+    version="0.1.0",
 )
 
-orchestrator = KitchenOrchestrator()
+tool_registry = ToolRegistry(state_manager)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,28 +28,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.websocket("/ws/voice/{session_id}")
-async def voice_websocket(websocket: WebSocket, session_id: str):
+async def voice_websocket(websocket: WebSocket, session_id: str) -> None:
     await websocket.accept()
-    print(f"WebSocket connected for session: {session_id}")
+    logger.info("WebSocket connected for session %s", session_id)
+    # One gateway per connection: no shared conversation state across clients.
+    gateway = LiveGateway(
+        websocket=websocket,
+        session_id=session_id,
+        state_manager=state_manager,
+        registry=tool_registry,
+    )
     try:
-        await orchestrator.handle_voice_session(websocket)
+        await gateway.run()
     except WebSocketDisconnect:
-        print(f"WebSocket disconnected for session: {session_id}")
-    except Exception as e:
-        print(f"WebSocket error for session {session_id}: {e}")
+        logger.info("WebSocket disconnected for session %s", session_id)
+    finally:
+        logger.info("Session %s closed", session_id)
+
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict:
     return {
         "status": "healthy",
-        "redis_connected": state_manager.use_redis
+        "redis_connected": state_manager.use_redis,
     }
 
+
 @app.get("/")
-async def root():
+async def root() -> dict:
     return {"message": "Welcome to the Kitchen Assistant API. Use /docs for API documentation."}
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

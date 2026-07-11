@@ -13,8 +13,9 @@ The phased roadmap is [`workplan.md`](workplan.md) — follow it, commit in smal
 - `app/main.py` — FastAPI app, WebSocket route
 - `app/schemas.py` — all Pydantic models (single source; no other schema module)
 - `app/state_manager.py` — session persistence (in-memory default, optional Redis)
+- `app/live/gateway.py` — LiveGateway: browser WS ↔ Gemini Live proxy
 - `app/tools/cooking_tools.py` — cooking tools with full docstrings
-- `app/orchestrator_v2.py` — interim buffered-audio orchestrator (dies in Phase 2, replaced by `app/live/gateway.py`)
+- `app/tools/registry.py` — FunctionDeclarations + server-side dispatch
 - `scripts/` — RAG ingestion/search utilities; `notebooks/` — exploration only
 
 ## Technical Standards
