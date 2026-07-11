@@ -37,6 +37,23 @@ SYSTEM_INSTRUCTION = (
 ConnectFactory = Callable[[], AsyncContextManager[Any]]
 
 
+def build_live_config(
+    registry: ToolRegistry, resumption_handle: Optional[str] = None
+) -> types.LiveConnectConfig:
+    """Live session config shared by the gateway and scripts/live_smoke.py."""
+    return types.LiveConnectConfig(
+        response_modalities=["AUDIO"],
+        system_instruction=SYSTEM_INSTRUCTION,
+        tools=registry.live_tools(),
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+        session_resumption=types.SessionResumptionConfig(handle=resumption_handle),
+        context_window_compression=types.ContextWindowCompressionConfig(
+            sliding_window=types.SlidingWindow()
+        ),
+    )
+
+
 class LiveGateway:
     """One instance per browser connection; owns the Gemini Live session."""
 
@@ -65,19 +82,7 @@ class LiveGateway:
         return client.aio.live.connect(model=self._model, config=self._build_config())
 
     def _build_config(self) -> types.LiveConnectConfig:
-        return types.LiveConnectConfig(
-            response_modalities=["AUDIO"],
-            system_instruction=SYSTEM_INSTRUCTION,
-            tools=self._registry.live_tools(),
-            input_audio_transcription=types.AudioTranscriptionConfig(),
-            output_audio_transcription=types.AudioTranscriptionConfig(),
-            session_resumption=types.SessionResumptionConfig(
-                handle=self._resumption_handle
-            ),
-            context_window_compression=types.ContextWindowCompressionConfig(
-                sliding_window=types.SlidingWindow()
-            ),
-        )
+        return build_live_config(self._registry, self._resumption_handle)
 
     async def run(self) -> None:
         """Proxy until the browser disconnects; reconnect to Gemini on GoAway.
