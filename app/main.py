@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 from .state_manager import state_manager
-from .models import RecipeState
+from .schemas import RecipeState
 from .orchestrator_v2 import KitchenOrchestrator
 
 load_dotenv()

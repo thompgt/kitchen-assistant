@@ -1,7 +1,7 @@
 import json
 from typing import Optional, Dict
 from datetime import datetime
-from .models import RecipeState
+from .schemas import RecipeState
 
 class StateManager:
     """
