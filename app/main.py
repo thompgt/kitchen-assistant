@@ -1,8 +1,11 @@
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .live.gateway import LiveGateway
 from .state_manager import state_manager
@@ -19,6 +22,9 @@ app = FastAPI(
 )
 
 tool_registry = ToolRegistry(state_manager)
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,8 +63,8 @@ async def health_check() -> dict:
 
 
 @app.get("/")
-async def root() -> dict:
-    return {"message": "Welcome to the Kitchen Assistant API. Use /docs for API documentation."}
+async def root() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 if __name__ == "__main__":
