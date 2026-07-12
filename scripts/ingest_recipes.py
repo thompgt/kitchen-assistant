@@ -1,11 +1,21 @@
-import os
 import json
+import os
+
 import duckdb
-from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_PATH = os.getenv("RECIPES_DB_PATH", "data/recipes.db")
+
 
 def ingest_sample_recipes():
-    con = duckdb.connect('notebooks/recipes.db')
-    
+    con = duckdb.connect(DB_PATH)
+    # The table's embedding column has an HNSW index (vss extension); DuckDB
+    # needs the extension loaded before it can update an indexed table.
+    con.execute("INSTALL vss;")
+    con.execute("LOAD vss;")
+
     recipes = [
         {
             "id": "r2",
@@ -60,16 +70,21 @@ def ingest_sample_recipes():
     ]
 
     for r in recipes:
-        con.execute("INSERT OR IGNORE INTO recipes VALUES (?, ?, ?, ?, ?, ?)", [
-            r['id'],
-            r['title'],
-            json.dumps(r['ingredients']),
-            json.dumps(r['steps']),
-            r['total_time_minutes'],
-            r['servings']
-        ])
-    
-    print(f"Successfully ingested {len(recipes)} new recipes.")
+        con.execute(
+            "INSERT OR IGNORE INTO recipes "
+            "(id, title, ingredients, steps, total_time_minutes, servings) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                r['id'],
+                r['title'],
+                json.dumps(r['ingredients']),
+                json.dumps(r['steps']),
+                r['total_time_minutes'],
+                r['servings'],
+            ],
+        )
+
+    print(f"Successfully ingested {len(recipes)} new recipes into {DB_PATH}.")
     con.close()
 
 if __name__ == "__main__":
