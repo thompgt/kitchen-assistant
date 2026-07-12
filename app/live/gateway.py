@@ -17,6 +17,8 @@ from fastapi import WebSocket
 from google import genai
 from google.genai import types
 
+from ..schemas import KitchenTimer
+from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
 from ..tools.registry import ToolRegistry
 
@@ -65,6 +67,7 @@ class LiveGateway:
         registry: ToolRegistry,
         connect_factory: Optional[ConnectFactory] = None,
         model: Optional[str] = None,
+        timer_engine: Optional[TimerEngine] = None,
     ):
         self._ws = websocket
         self._session_id = session_id
@@ -72,8 +75,10 @@ class LiveGateway:
         self._registry = registry
         self._model = model or os.getenv("LIVE_MODEL", DEFAULT_LIVE_MODEL)
         self._connect_factory = connect_factory or self._default_connect_factory
+        self._timer_engine = timer_engine
         self._resumption_handle: Optional[str] = None
         self._closing = False
+        self._session: Optional[Any] = None
 
     # -- connection ---------------------------------------------------------
 
@@ -91,29 +96,37 @@ class LiveGateway:
         keeps its conversation context across the ~10-minute Live connection
         limit (ADR-005).
         """
-        while not self._closing:
-            async with self._connect_factory() as session:
-                await self._send_json({"type": "session.status", "status": "ready"})
-                uplink = asyncio.create_task(self._uplink(session))
-                downlink = asyncio.create_task(self._downlink(session))
-                done, pending = await asyncio.wait(
-                    {uplink, downlink}, return_when=asyncio.FIRST_COMPLETED
-                )
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-                for task in done:
-                    task.result()  # surface uplink/downlink errors
+        if self._timer_engine is not None:
+            self._timer_engine.register_session(self._session_id, self._on_timer_expired)
+        try:
+            while not self._closing:
+                async with self._connect_factory() as session:
+                    self._session = session
+                    await self._send_json({"type": "session.status", "status": "ready"})
+                    uplink = asyncio.create_task(self._uplink(session))
+                    downlink = asyncio.create_task(self._downlink(session))
+                    done, pending = await asyncio.wait(
+                        {uplink, downlink}, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in pending:
+                        task.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                    for task in done:
+                        task.result()  # surface uplink/downlink errors
+                self._session = None
 
-            if not self._closing:
-                logger.info(
-                    "session %s: Live connection ended, reconnecting (handle=%s)",
-                    self._session_id,
-                    "yes" if self._resumption_handle else "no",
-                )
-                await self._send_json(
-                    {"type": "session.status", "status": "reconnecting"}
-                )
+                if not self._closing:
+                    logger.info(
+                        "session %s: Live connection ended, reconnecting (handle=%s)",
+                        self._session_id,
+                        "yes" if self._resumption_handle else "no",
+                    )
+                    await self._send_json(
+                        {"type": "session.status", "status": "reconnecting"}
+                    )
+        finally:
+            if self._timer_engine is not None:
+                self._timer_engine.unregister_session(self._session_id)
 
     # -- browser -> Gemini ----------------------------------------------------
 
@@ -203,6 +216,22 @@ class LiveGateway:
         if responses:
             await session.send_tool_response(function_responses=responses)
             await self._send_state_snapshot()
+
+    # -- timer engine -> browser + model ---------------------------------------
+
+    async def _on_timer_expired(self, timer: KitchenTimer) -> None:
+        """Registered with TimerEngine; fires even when the model is idle."""
+        await self._send_json(
+            {"type": "timer.expired", "timer_id": timer.id, "label": timer.label}
+        )
+        await self._send_state_snapshot()
+        if self._session is not None:
+            await self._session.send_realtime_input(
+                text=(
+                    f"[System: the '{timer.label}' timer just expired. "
+                    "Announce this to the chef now.]"
+                )
+            )
 
     async def _send_state_snapshot(self) -> None:
         state = await self._state_manager.get_state(self._session_id)

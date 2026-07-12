@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .live.gateway import LiveGateway
+from .services.timer_engine import TimerEngine
 from .state_manager import state_manager
 from .tools.registry import ToolRegistry
 
@@ -21,7 +22,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
-tool_registry = ToolRegistry(state_manager)
+timer_engine = TimerEngine(state_manager)
+tool_registry = ToolRegistry(state_manager, timer_engine=timer_engine)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -45,6 +47,7 @@ async def voice_websocket(websocket: WebSocket, session_id: str) -> None:
         session_id=session_id,
         state_manager=state_manager,
         registry=tool_registry,
+        timer_engine=timer_engine,
     )
     try:
         await gateway.run()
