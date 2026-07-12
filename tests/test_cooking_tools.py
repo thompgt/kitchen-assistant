@@ -1,3 +1,5 @@
+from typing import Dict, Optional
+
 import pytest
 
 from app.schemas import RecipeMetadata, RecipeState
@@ -7,10 +9,32 @@ from app.tools.cooking_tools import (
     cancel_timer,
     convert_units,
     list_timers,
+    load_recipe,
     navigate_steps,
     scale_recipe,
+    search_recipes,
     set_kitchen_timer,
 )
+
+
+class FakeRecipeStore:
+    """Stub matching RecipeStore's async interface, no DuckDB/network involved."""
+
+    def __init__(self, recipes: Dict[str, RecipeMetadata]):
+        self._recipes = recipes
+
+    async def search(self, query: str, k: int = 3):
+        from app.schemas import RecipeSearchResult
+
+        return [
+            RecipeSearchResult(
+                id=r.id, title=r.title, total_time_minutes=r.total_time_minutes, distance=0.1 * i
+            )
+            for i, r in enumerate(list(self._recipes.values())[:k])
+        ]
+
+    async def get_recipe(self, recipe_id: str) -> Optional[RecipeMetadata]:
+        return self._recipes.get(recipe_id)
 
 
 async def _load_recipe(
@@ -191,6 +215,61 @@ async def test_scale_recipe_recomputes_ingredient_amounts(
         {"name": "spaghetti", "amount": 300.0, "unit": "g"},
         {"name": "olive oil", "amount": 3.0, "unit": "tbsp"},
     ]
+
+
+# --- search_recipes / load_recipe --------------------------------------------
+
+async def test_search_recipes_returns_ranked_results(sample_recipe: RecipeMetadata) -> None:
+    store = FakeRecipeStore({sample_recipe.id: sample_recipe})
+    result = await search_recipes(store, "pasta", k=3)
+    assert result["status"] == "success"
+    assert result["results"] == [
+        {"id": "pasta-01", "title": "Weeknight Pasta", "total_time_minutes": 20}
+    ]
+
+
+async def test_load_recipe_hydrates_state(
+    state_manager: StateManager, sample_recipe: RecipeMetadata
+) -> None:
+    store = FakeRecipeStore({sample_recipe.id: sample_recipe})
+    result = await load_recipe(state_manager, "s1", store, "pasta-01")
+
+    assert result["status"] == "success"
+    assert result["title"] == "Weeknight Pasta"
+    assert result["total_steps"] == 3
+    assert result["first_instruction"] == "Boil salted water."
+
+    state = await state_manager.get_state("s1")
+    assert state is not None
+    assert state.recipe_metadata is not None
+    assert state.recipe_metadata.id == "pasta-01"
+    assert state.current_step_index == 0
+
+
+async def test_load_recipe_unknown_id_returns_error(state_manager: StateManager) -> None:
+    store = FakeRecipeStore({})
+    result = await load_recipe(state_manager, "s1", store, "nope")
+    assert result["status"] == "error"
+    assert await state_manager.get_state("s1") is None  # nothing persisted
+
+
+async def test_load_recipe_resets_step_index_and_multiplier(
+    state_manager: StateManager, sample_recipe: RecipeMetadata
+) -> None:
+    await scale_recipe(state_manager, "s1", 3.0)
+    await navigate_steps(state_manager, "s1", "jump", step_index=1)  # no-op, no recipe loaded yet
+
+    store = FakeRecipeStore({sample_recipe.id: sample_recipe})
+    await load_recipe(state_manager, "s1", store, "pasta-01")
+    await navigate_steps(state_manager, "s1", "next")
+
+    store2 = FakeRecipeStore({sample_recipe.id: sample_recipe})
+    await load_recipe(state_manager, "s1", store2, "pasta-01")
+
+    state = await state_manager.get_state("s1")
+    assert state is not None
+    assert state.current_step_index == 0
+    assert state.servings_multiplier == 1.0
 
 
 # --- navigate_steps ----------------------------------------------------------

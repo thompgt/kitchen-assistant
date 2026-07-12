@@ -41,6 +41,12 @@ class RecipeState(BaseModel):
     servings_multiplier: float = 1.0
     last_updated: datetime = Field(default_factory=datetime.now)
 
+class RecipeSearchResult(BaseModel):
+    id: str
+    title: str
+    total_time_minutes: int
+    distance: float
+
 class UserUtterance(BaseModel):
     text: str
     session_id: str

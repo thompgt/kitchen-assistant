@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from ..schemas import KitchenTimer, RecipeState
+from ..services.recipe_store import RecipeStore
 from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
 
@@ -226,6 +227,63 @@ async def scale_recipe(
     else:
         result["note"] = "No recipe loaded; multiplier stored and applied once one is loaded."
     return result
+
+
+async def search_recipes(recipe_store: RecipeStore, query: str, k: int = 3) -> Dict[str, Any]:
+    """
+    Searches the recipe catalog by meaning, not just keyword match.
+
+    Args:
+        recipe_store: Injected recipe search service (not model-visible).
+        query: What the chef is looking for, e.g. "something with mushrooms".
+        k: Maximum number of results to return.
+
+    Returns:
+        A dictionary with the top matching recipes (id, title, total_time_minutes).
+    """
+    results = await recipe_store.search(query, k=k)
+    return {
+        "status": "success",
+        "results": [
+            {"id": r.id, "title": r.title, "total_time_minutes": r.total_time_minutes}
+            for r in results
+        ],
+    }
+
+
+async def load_recipe(
+    state_manager: StateManager, session_id: str, recipe_store: RecipeStore, recipe_id: str
+) -> Dict[str, Any]:
+    """
+    Loads a recipe into the session so its steps and ingredients become active.
+
+    Args:
+        state_manager: Injected session store (not model-visible).
+        session_id: The unique identifier for the session (not model-visible).
+        recipe_store: Injected recipe search service (not model-visible).
+        recipe_id: The identifier of the recipe to load (from search_recipes results).
+
+    Returns:
+        The loaded recipe's title and first instruction, or a structured error.
+    """
+    recipe = await recipe_store.get_recipe(recipe_id)
+    if recipe is None:
+        return _error(f"No recipe found with id '{recipe_id}'.")
+
+    def _load(state: RecipeState) -> None:
+        state.recipe_id = recipe.id
+        state.recipe_metadata = recipe
+        state.current_step_index = 0
+        state.servings_multiplier = 1.0
+
+    await state_manager.update(session_id, _load)
+    return {
+        "status": "success",
+        "recipe_id": recipe.id,
+        "title": recipe.title,
+        "total_steps": len(recipe.steps),
+        "first_instruction": recipe.steps[0].instruction if recipe.steps else None,
+    }
 
 
 async def navigate_steps(

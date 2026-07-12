@@ -1,6 +1,27 @@
+from app.schemas import RecipeMetadata
 from app.services.timer_engine import TimerEngine
 from app.state_manager import StateManager
 from app.tools.registry import ToolRegistry
+
+
+class FakeRecipeStore:
+    def __init__(self, recipe: RecipeMetadata):
+        self._recipe = recipe
+
+    async def search(self, query: str, k: int = 3):
+        from app.schemas import RecipeSearchResult
+
+        return [
+            RecipeSearchResult(
+                id=self._recipe.id,
+                title=self._recipe.title,
+                total_time_minutes=self._recipe.total_time_minutes,
+                distance=0.0,
+            )
+        ]
+
+    async def get_recipe(self, recipe_id: str):
+        return self._recipe if recipe_id == self._recipe.id else None
 
 
 def test_declarations_never_expose_injected_params(state_manager: StateManager) -> None:
@@ -11,6 +32,7 @@ def test_declarations_never_expose_injected_params(state_manager: StateManager) 
         assert "session_id" not in params
         assert "state_manager" not in params
         assert "timer_engine" not in params
+        assert "recipe_store" not in params
 
 
 async def test_dispatch_injects_session_and_state(state_manager: StateManager) -> None:
@@ -53,6 +75,24 @@ async def test_dispatch_cancel_and_list_timers(state_manager: StateManager) -> N
 
     listed_after = await registry.dispatch("s1", "list_timers", {})
     assert listed_after["timers"] == []
+
+
+async def test_dispatch_search_and_load_recipe(
+    state_manager: StateManager, sample_recipe: RecipeMetadata
+) -> None:
+    registry = ToolRegistry(state_manager, recipe_store=FakeRecipeStore(sample_recipe))
+
+    searched = await registry.dispatch("s1", "search_recipes", {"query": "pasta"})
+    assert searched["status"] == "success"
+    assert searched["results"][0]["id"] == sample_recipe.id
+
+    loaded = await registry.dispatch("s1", "load_recipe", {"recipe_id": sample_recipe.id})
+    assert loaded["status"] == "success"
+
+    state = await state_manager.get_state("s1")
+    assert state is not None
+    assert state.recipe_metadata is not None
+    assert state.recipe_metadata.id == sample_recipe.id
 
 
 async def test_dispatch_tool_without_state_params(state_manager: StateManager) -> None:

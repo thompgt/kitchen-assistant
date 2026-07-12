@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .live.gateway import LiveGateway
+from .services.recipe_store import RecipeStore
 from .services.timer_engine import TimerEngine
 from .state_manager import state_manager
 from .tools.registry import ToolRegistry
@@ -23,7 +24,8 @@ app = FastAPI(
 )
 
 timer_engine = TimerEngine(state_manager)
-tool_registry = ToolRegistry(state_manager, timer_engine=timer_engine)
+recipe_store = RecipeStore()
+tool_registry = ToolRegistry(state_manager, timer_engine=timer_engine, recipe_store=recipe_store)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

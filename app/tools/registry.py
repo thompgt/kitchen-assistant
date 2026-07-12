@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from google.genai import types
 
+from ..services.recipe_store import RecipeStore
 from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
 from . import cooking_tools
@@ -94,6 +95,38 @@ _DECLARATIONS: List[types.FunctionDeclaration] = [
         ),
     ),
     types.FunctionDeclaration(
+        name="search_recipes",
+        description="Search the recipe catalog by meaning (semantic search), not just keywords.",
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "query": types.Schema(
+                    type=types.Type.STRING,
+                    description="What the chef is looking for, e.g. 'something with mushrooms'.",
+                ),
+                "k": types.Schema(
+                    type=types.Type.INTEGER,
+                    description="Maximum number of results to return. Defaults to 3.",
+                ),
+            },
+            required=["query"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="load_recipe",
+        description="Load a recipe into the session so its steps and ingredients become active.",
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "recipe_id": types.Schema(
+                    type=types.Type.STRING,
+                    description="The identifier of the recipe to load, from search_recipes results.",
+                ),
+            },
+            required=["recipe_id"],
+        ),
+    ),
+    types.FunctionDeclaration(
         name="navigate_steps",
         description=(
             "Move through the loaded recipe's instructions and read back the "
@@ -124,15 +157,23 @@ _IMPLEMENTATIONS: Dict[str, ToolFn] = {
     "convert_units": cooking_tools.convert_units,
     "scale_recipe": cooking_tools.scale_recipe,
     "navigate_steps": cooking_tools.navigate_steps,
+    "search_recipes": cooking_tools.search_recipes,
+    "load_recipe": cooking_tools.load_recipe,
 }
 
 
 class ToolRegistry:
     """Maps tool name -> (FunctionDeclaration, async callable) and dispatches calls."""
 
-    def __init__(self, state_manager: StateManager, timer_engine: Optional[TimerEngine] = None):
+    def __init__(
+        self,
+        state_manager: StateManager,
+        timer_engine: Optional[TimerEngine] = None,
+        recipe_store: Optional[RecipeStore] = None,
+    ):
         self._state_manager = state_manager
         self._timer_engine = timer_engine
+        self._recipe_store = recipe_store
         self._tools: Dict[str, Tuple[types.FunctionDeclaration, ToolFn]] = {}
         for declaration in _DECLARATIONS:
             assert declaration.name is not None
@@ -168,6 +209,8 @@ class ToolRegistry:
             kwargs["session_id"] = session_id
         if "timer_engine" in signature:
             kwargs["timer_engine"] = self._timer_engine
+        if "recipe_store" in signature:
+            kwargs["recipe_store"] = self._recipe_store
 
         try:
             return await fn(**kwargs)
