@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from ..schemas import KitchenTimer, RecipeState
+from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
 
 # Unit aliases normalize plural/long/symbol forms to canonical short names.
@@ -48,7 +49,11 @@ def _normalize_unit(unit: str) -> str:
 
 
 async def set_kitchen_timer(
-    state_manager: StateManager, session_id: str, duration_seconds: int, label: str
+    state_manager: StateManager,
+    session_id: str,
+    duration_seconds: int,
+    label: str,
+    timer_engine: Optional[TimerEngine] = None,
 ) -> Dict[str, Any]:
     """
     Sets a new kitchen timer and tracks it in the session state.
@@ -58,6 +63,7 @@ async def set_kitchen_timer(
         session_id: The unique identifier for the cooking session (not model-visible).
         duration_seconds: How long the timer should run. Must be positive.
         label: A descriptive name for the timer (e.g., "Boiling Pasta").
+        timer_engine: Injected countdown engine (not model-visible).
 
     Returns:
         A dictionary confirming the timer details, or a structured error.
@@ -78,7 +84,68 @@ async def set_kitchen_timer(
         state.active_timers[timer_id] = timer
 
     await state_manager.update(session_id, _add_timer)
+    if timer_engine is not None:
+        timer_engine.start(session_id, timer)
     return {"status": "success", "timer_id": timer_id, "label": label, "duration": duration_seconds}
+
+
+async def cancel_timer(
+    state_manager: StateManager,
+    session_id: str,
+    timer_id: str,
+    timer_engine: Optional[TimerEngine] = None,
+) -> Dict[str, Any]:
+    """
+    Cancels an active kitchen timer before it expires.
+
+    Args:
+        state_manager: Injected session store (not model-visible).
+        session_id: The unique identifier for the session (not model-visible).
+        timer_id: The identifier returned when the timer was set.
+        timer_engine: Injected countdown engine (not model-visible).
+
+    Returns:
+        Confirmation of the cancellation, or a structured error if the timer is unknown.
+    """
+    state = await state_manager.get_state(session_id)
+    if state is None or timer_id not in state.active_timers:
+        return _error(f"No active timer with id '{timer_id}'.")
+
+    label = state.active_timers[timer_id].label
+    if timer_engine is not None:
+        timer_engine.cancel(session_id, timer_id)
+
+    def _remove_timer(s: RecipeState) -> None:
+        s.active_timers.pop(timer_id, None)
+
+    await state_manager.update(session_id, _remove_timer)
+    return {"status": "success", "timer_id": timer_id, "label": label}
+
+
+async def list_timers(state_manager: StateManager, session_id: str) -> Dict[str, Any]:
+    """
+    Lists all currently active kitchen timers and their remaining time.
+
+    Args:
+        state_manager: Injected session store (not model-visible).
+        session_id: The unique identifier for the session (not model-visible).
+
+    Returns:
+        A dictionary with the active timers, each including remaining seconds.
+    """
+    state = await state_manager.get_state(session_id)
+    timers = []
+    if state is not None:
+        now = datetime.now()
+        for timer in state.active_timers.values():
+            if not timer.is_active:
+                continue
+            elapsed = (now - timer.start_time).total_seconds()
+            remaining = max(0, round(timer.duration_seconds - elapsed))
+            timers.append(
+                {"timer_id": timer.id, "label": timer.label, "remaining_seconds": remaining}
+            )
+    return {"status": "success", "timers": timers}
 
 
 async def convert_units(value: float, from_unit: str, to_unit: str) -> Dict[str, Any]:

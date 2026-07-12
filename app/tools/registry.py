@@ -5,10 +5,11 @@ The model only ever sees user-meaningful parameters. `session_id` and
 tool registry) and never appear in a declaration.
 """
 import inspect
-from typing import Any, Awaitable, Callable, Dict, List, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from google.genai import types
 
+from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
 from . import cooking_tools
 
@@ -32,6 +33,25 @@ _DECLARATIONS: List[types.FunctionDeclaration] = [
             },
             required=["duration_seconds", "label"],
         ),
+    ),
+    types.FunctionDeclaration(
+        name="cancel_timer",
+        description="Cancel an active kitchen timer before it expires.",
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "timer_id": types.Schema(
+                    type=types.Type.STRING,
+                    description="The identifier returned when the timer was set.",
+                ),
+            },
+            required=["timer_id"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="list_timers",
+        description="List all currently active kitchen timers with remaining time.",
+        parameters=types.Schema(type=types.Type.OBJECT, properties={}),
     ),
     types.FunctionDeclaration(
         name="convert_units",
@@ -99,6 +119,8 @@ _DECLARATIONS: List[types.FunctionDeclaration] = [
 
 _IMPLEMENTATIONS: Dict[str, ToolFn] = {
     "set_kitchen_timer": cooking_tools.set_kitchen_timer,
+    "cancel_timer": cooking_tools.cancel_timer,
+    "list_timers": cooking_tools.list_timers,
     "convert_units": cooking_tools.convert_units,
     "scale_recipe": cooking_tools.scale_recipe,
     "navigate_steps": cooking_tools.navigate_steps,
@@ -108,8 +130,9 @@ _IMPLEMENTATIONS: Dict[str, ToolFn] = {
 class ToolRegistry:
     """Maps tool name -> (FunctionDeclaration, async callable) and dispatches calls."""
 
-    def __init__(self, state_manager: StateManager):
+    def __init__(self, state_manager: StateManager, timer_engine: Optional[TimerEngine] = None):
         self._state_manager = state_manager
+        self._timer_engine = timer_engine
         self._tools: Dict[str, Tuple[types.FunctionDeclaration, ToolFn]] = {}
         for declaration in _DECLARATIONS:
             assert declaration.name is not None
@@ -143,6 +166,8 @@ class ToolRegistry:
             kwargs["state_manager"] = self._state_manager
         if "session_id" in signature:
             kwargs["session_id"] = session_id
+        if "timer_engine" in signature:
+            kwargs["timer_engine"] = self._timer_engine
 
         try:
             return await fn(**kwargs)

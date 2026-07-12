@@ -1,9 +1,12 @@
 import pytest
 
 from app.schemas import RecipeMetadata, RecipeState
+from app.services.timer_engine import TimerEngine
 from app.state_manager import StateManager
 from app.tools.cooking_tools import (
+    cancel_timer,
     convert_units,
+    list_timers,
     navigate_steps,
     scale_recipe,
     set_kitchen_timer,
@@ -40,6 +43,78 @@ async def test_set_timer_rejects_non_positive_duration(
     result = await set_kitchen_timer(state_manager, "s1", duration, "Bad")
     assert result["status"] == "error"
     assert await state_manager.get_state("s1") is None  # nothing persisted
+
+
+async def test_set_timer_starts_engine_countdown(state_manager: StateManager) -> None:
+    engine = TimerEngine(state_manager)
+    result = await set_kitchen_timer(state_manager, "s1", 300, "Boiling Pasta", timer_engine=engine)
+    assert result["status"] == "success"
+    assert engine.active_count("s1") == 1
+    engine.cancel("s1", result["timer_id"])
+
+
+# --- cancel_timer --------------------------------------------------------------
+
+async def test_cancel_timer_removes_from_state(state_manager: StateManager) -> None:
+    set_result = await set_kitchen_timer(state_manager, "s1", 300, "Boiling Pasta")
+    timer_id = set_result["timer_id"]
+
+    result = await cancel_timer(state_manager, "s1", timer_id)
+    assert result["status"] == "success"
+    assert result["label"] == "Boiling Pasta"
+
+    state = await state_manager.get_state("s1")
+    assert state is not None
+    assert timer_id not in state.active_timers
+
+
+async def test_cancel_timer_stops_engine_countdown(state_manager: StateManager) -> None:
+    engine = TimerEngine(state_manager)
+    set_result = await set_kitchen_timer(
+        state_manager, "s1", 300, "Boiling Pasta", timer_engine=engine
+    )
+    timer_id = set_result["timer_id"]
+
+    result = await cancel_timer(state_manager, "s1", timer_id, timer_engine=engine)
+    assert result["status"] == "success"
+    assert engine.active_count("s1") == 0
+
+
+async def test_cancel_timer_unknown_id_returns_error(state_manager: StateManager) -> None:
+    result = await cancel_timer(state_manager, "s1", "nope")
+    assert result["status"] == "error"
+
+
+# --- list_timers ---------------------------------------------------------------
+
+async def test_list_timers_empty_when_no_session(state_manager: StateManager) -> None:
+    result = await list_timers(state_manager, "s1")
+    assert result == {"status": "success", "timers": []}
+
+
+async def test_list_timers_reports_active_timers(state_manager: StateManager) -> None:
+    await set_kitchen_timer(state_manager, "s1", 300, "Boiling Pasta")
+    await set_kitchen_timer(state_manager, "s1", 60, "Toast")
+
+    result = await list_timers(state_manager, "s1")
+    assert result["status"] == "success"
+    labels = {t["label"] for t in result["timers"]}
+    assert labels == {"Boiling Pasta", "Toast"}
+    for timer in result["timers"]:
+        assert 0 <= timer["remaining_seconds"] <= 300
+
+
+async def test_list_timers_excludes_expired_timers(state_manager: StateManager) -> None:
+    set_result = await set_kitchen_timer(state_manager, "s1", 300, "Boiling Pasta")
+    timer_id = set_result["timer_id"]
+
+    def _expire(state: RecipeState) -> None:
+        state.active_timers[timer_id].is_active = False
+
+    await state_manager.update("s1", _expire)
+
+    result = await list_timers(state_manager, "s1")
+    assert result["timers"] == []
 
 
 # --- convert_units -----------------------------------------------------------
