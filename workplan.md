@@ -109,7 +109,10 @@ Phases 3, 4, and 5 are independent of each other and can run in any order or in 
 
 - React HUD per `frontend_plan.md` (the WS protocol is already compatible).
 - Multimodal camera doneness checks (from `notebooks/02_multimodal_practice.ipynb`; Live API video frames).
-- Real recipe ingestion pipeline (beyond 4 hardcoded recipes; batch embeddings).
+- ~~Real recipe ingestion pipeline (beyond 4 hardcoded recipes; batch embeddings).~~ Done —
+  catalog now lives in `data/recipes_seed.json` (16 recipes), `scripts/ingest_recipes.py`
+  is idempotent and rebuilds the schema from scratch, `scripts/setup_vector_search.py`
+  batch-embeds only rows missing a vector.
 - Auth / multi-user; deployment story (single container; Redis becomes relevant here).
 
 ---
