@@ -27,3 +27,15 @@ jobs:
 
       - name: Test (pytest)
         run: poetry run pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend (HUD)
+        working-directory: frontend
+        run: npm run build

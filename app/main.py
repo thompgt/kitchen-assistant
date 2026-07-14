@@ -30,6 +30,10 @@ tool_registry = ToolRegistry(state_manager, timer_engine=timer_engine, recipe_st
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+HUD_DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if HUD_DIST_DIR.is_dir():
+    app.mount("/hud", StaticFiles(directory=HUD_DIST_DIR, html=True), name="hud")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
