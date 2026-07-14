@@ -1,5 +1,13 @@
+"""Load the recipe catalog from data/recipes_seed.json into DuckDB.
+
+Idempotent and reproducible from scratch: creates the `recipes` table if it
+doesn't exist, then inserts any seed recipes not already present by id.
+Embeddings are populated separately by scripts/setup_vector_search.py.
+"""
 import json
 import os
+from pathlib import Path
+from typing import Any, Dict, List
 
 import duckdb
 from dotenv import load_dotenv
@@ -7,85 +15,87 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DB_PATH = os.getenv("RECIPES_DB_PATH", "data/recipes.db")
+SEED_PATH = Path(__file__).resolve().parent.parent / "data" / "recipes_seed.json"
+
+REQUIRED_RECIPE_FIELDS = {"id", "title", "ingredients", "steps", "total_time_minutes", "servings"}
+REQUIRED_INGREDIENT_FIELDS = {"name", "amount", "unit"}
+REQUIRED_STEP_FIELDS = {"step_number", "instruction"}
 
 
-def ingest_sample_recipes():
-    con = duckdb.connect(DB_PATH)
-    # The table's embedding column has an HNSW index (vss extension); DuckDB
-    # needs the extension loaded before it can update an indexed table.
+def load_seed_recipes(seed_path: Path = SEED_PATH) -> List[Dict[str, Any]]:
+    """Load and shallow-validate the seed catalog. Raises ValueError on a malformed entry."""
+    recipes = json.loads(seed_path.read_text(encoding="utf-8"))
+
+    for recipe in recipes:
+        missing = REQUIRED_RECIPE_FIELDS - recipe.keys()
+        if missing:
+            raise ValueError(f"Recipe {recipe.get('id', '?')} missing fields: {missing}")
+        for ingredient in recipe["ingredients"]:
+            missing = REQUIRED_INGREDIENT_FIELDS - ingredient.keys()
+            if missing:
+                raise ValueError(f"Recipe {recipe['id']} has an ingredient missing fields: {missing}")
+        for step in recipe["steps"]:
+            missing = REQUIRED_STEP_FIELDS - step.keys()
+            if missing:
+                raise ValueError(f"Recipe {recipe['id']} has a step missing fields: {missing}")
+
+    ids = [r["id"] for r in recipes]
+    duplicates = {i for i in ids if ids.count(i) > 1}
+    if duplicates:
+        raise ValueError(f"Duplicate recipe ids in seed data: {duplicates}")
+
+    return recipes
+
+
+def ensure_schema(con: "duckdb.DuckDBPyConnection") -> None:
     con.execute("INSTALL vss;")
     con.execute("LOAD vss;")
-
-    recipes = [
-        {
-            "id": "r2",
-            "title": "Mushroom Risotto",
-            "ingredients": [
-                {"name": "Arborio Rice", "amount": 1, "unit": "cup"},
-                {"name": "Mushrooms", "amount": 250, "unit": "g"},
-                {"name": "Vegetable Broth", "amount": 500, "unit": "ml"},
-                {"name": "Onion", "amount": 1, "unit": "piece"}
-            ],
-            "steps": [
-                {"step_number": 1, "instruction": "Sauté onions and mushrooms until soft."},
-                {"step_number": 2, "instruction": "Add rice and toast for 2 minutes."},
-                {"step_number": 3, "instruction": "Add broth ladle by ladle, stirring constantly."}
-            ],
-            "total_time_minutes": 45,
-            "servings": 4
-        },
-        {
-            "id": "r3",
-            "title": "Thai Green Curry",
-            "ingredients": [
-                {"name": "Chicken Breast", "amount": 300, "unit": "g"},
-                {"name": "Coconut Milk", "amount": 400, "unit": "ml"},
-                {"name": "Green Curry Paste", "amount": 2, "unit": "tbsp"},
-                {"name": "Eggplant", "amount": 1, "unit": "piece"}
-            ],
-            "steps": [
-                {"step_number": 1, "instruction": "Fry curry paste in a bit of oil until fragrant."},
-                {"step_number": 2, "instruction": "Add chicken and cook until sealed."},
-                {"step_number": 3, "instruction": "Pour in coconut milk and add eggplant."}
-            ],
-            "total_time_minutes": 30,
-            "servings": 3
-        },
-        {
-            "id": "r4",
-            "title": "Taco Tuesday Beef",
-            "ingredients": [
-                {"name": "Ground Beef", "amount": 500, "unit": "g"},
-                {"name": "Taco Seasoning", "amount": 1, "unit": "packet"},
-                {"name": "Water", "amount": 100, "unit": "ml"}
-            ],
-            "steps": [
-                {"step_number": 1, "instruction": "Brown the beef in a skillet over medium heat."},
-                {"step_number": 2, "instruction": "Drain excess fat."},
-                {"step_number": 3, "instruction": "Add seasoning and water, simmer for 5 minutes."}
-            ],
-            "total_time_minutes": 15,
-            "servings": 4
-        }
-    ]
-
-    for r in recipes:
-        con.execute(
-            "INSERT OR IGNORE INTO recipes "
-            "(id, title, ingredients, steps, total_time_minutes, servings) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            [
-                r['id'],
-                r['title'],
-                json.dumps(r['ingredients']),
-                json.dumps(r['steps']),
-                r['total_time_minutes'],
-                r['servings'],
-            ],
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipes (
+            id VARCHAR PRIMARY KEY,
+            title VARCHAR,
+            ingredients JSON,
+            steps JSON,
+            total_time_minutes INTEGER,
+            servings INTEGER,
+            embedding FLOAT[3072]
         )
+        """
+    )
 
-    print(f"Successfully ingested {len(recipes)} new recipes into {DB_PATH}.")
-    con.close()
+
+def ingest_recipes(db_path: str = DB_PATH, seed_path: Path = SEED_PATH) -> int:
+    recipes = load_seed_recipes(seed_path)
+
+    con = duckdb.connect(db_path)
+    try:
+        ensure_schema(con)
+        before = con.execute("SELECT COUNT(*) FROM recipes").fetchone()[0]
+
+        for r in recipes:
+            con.execute(
+                "INSERT OR IGNORE INTO recipes "
+                "(id, title, ingredients, steps, total_time_minutes, servings) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    r["id"],
+                    r["title"],
+                    json.dumps(r["ingredients"]),
+                    json.dumps(r["steps"]),
+                    r["total_time_minutes"],
+                    r["servings"],
+                ],
+            )
+
+        after = con.execute("SELECT COUNT(*) FROM recipes").fetchone()[0]
+    finally:
+        con.close()
+
+    inserted = after - before
+    print(f"Ingested {inserted} new recipe(s) into {db_path} ({after} total, {len(recipes)} in seed).")
+    return inserted
+
 
 if __name__ == "__main__":
-    ingest_sample_recipes()
+    ingest_recipes()

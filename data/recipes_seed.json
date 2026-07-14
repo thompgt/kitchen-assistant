@@ -1,0 +1,293 @@
+[
+  {
+    "id": "r1",
+    "title": "Classic Carbonara",
+    "ingredients": [
+      {"name": "Spaghetti", "amount": 200, "unit": "g"},
+      {"name": "Guanciale", "amount": 100, "unit": "g"},
+      {"name": "Egg Yolks", "amount": 3, "unit": "piece"},
+      {"name": "Pecorino Romano", "amount": 50, "unit": "g"},
+      {"name": "Black Pepper", "amount": 1, "unit": "tsp"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Boil salted water and cook spaghetti until al dente."},
+      {"step_number": 2, "instruction": "Render the guanciale in a cold pan over medium heat until crisp."},
+      {"step_number": 3, "instruction": "Whisk egg yolks with pecorino and black pepper."},
+      {"step_number": 4, "instruction": "Off heat, toss pasta with guanciale fat, then the egg mixture, adding pasta water to loosen."}
+    ],
+    "total_time_minutes": 20,
+    "servings": 2
+  },
+  {
+    "id": "r2",
+    "title": "Mushroom Risotto",
+    "ingredients": [
+      {"name": "Arborio Rice", "amount": 1, "unit": "cup"},
+      {"name": "Mushrooms", "amount": 250, "unit": "g"},
+      {"name": "Vegetable Broth", "amount": 500, "unit": "ml"},
+      {"name": "Onion", "amount": 1, "unit": "piece"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Sauté onions and mushrooms until soft."},
+      {"step_number": 2, "instruction": "Add rice and toast for 2 minutes."},
+      {"step_number": 3, "instruction": "Add broth ladle by ladle, stirring constantly."}
+    ],
+    "total_time_minutes": 45,
+    "servings": 4
+  },
+  {
+    "id": "r3",
+    "title": "Thai Green Curry",
+    "ingredients": [
+      {"name": "Chicken Breast", "amount": 300, "unit": "g"},
+      {"name": "Coconut Milk", "amount": 400, "unit": "ml"},
+      {"name": "Green Curry Paste", "amount": 2, "unit": "tbsp"},
+      {"name": "Eggplant", "amount": 1, "unit": "piece"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Fry curry paste in a bit of oil until fragrant."},
+      {"step_number": 2, "instruction": "Add chicken and cook until sealed."},
+      {"step_number": 3, "instruction": "Pour in coconut milk and add eggplant."}
+    ],
+    "total_time_minutes": 30,
+    "servings": 3
+  },
+  {
+    "id": "r4",
+    "title": "Taco Tuesday Beef",
+    "ingredients": [
+      {"name": "Ground Beef", "amount": 500, "unit": "g"},
+      {"name": "Taco Seasoning", "amount": 1, "unit": "packet"},
+      {"name": "Water", "amount": 100, "unit": "ml"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Brown the beef in a skillet over medium heat."},
+      {"step_number": 2, "instruction": "Drain excess fat."},
+      {"step_number": 3, "instruction": "Add seasoning and water, simmer for 5 minutes."}
+    ],
+    "total_time_minutes": 15,
+    "servings": 4
+  },
+  {
+    "id": "r5",
+    "title": "Margherita Pizza",
+    "ingredients": [
+      {"name": "Pizza Dough", "amount": 1, "unit": "piece"},
+      {"name": "Crushed Tomatoes", "amount": 150, "unit": "g"},
+      {"name": "Fresh Mozzarella", "amount": 125, "unit": "g"},
+      {"name": "Basil Leaves", "amount": 6, "unit": "piece"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Stretch dough into a round on a floured surface."},
+      {"step_number": 2, "instruction": "Spread crushed tomatoes, leaving a border for the crust."},
+      {"step_number": 3, "instruction": "Tear mozzarella over the top and bake at 250C until the crust blisters."},
+      {"step_number": 4, "instruction": "Finish with fresh basil and a drizzle of olive oil."}
+    ],
+    "total_time_minutes": 35,
+    "servings": 2
+  },
+  {
+    "id": "r6",
+    "title": "Chicken Tikka Masala",
+    "ingredients": [
+      {"name": "Chicken Thigh", "amount": 600, "unit": "g"},
+      {"name": "Yogurt", "amount": 150, "unit": "g"},
+      {"name": "Tikka Masala Spice Mix", "amount": 3, "unit": "tbsp"},
+      {"name": "Tomato Puree", "amount": 400, "unit": "g"},
+      {"name": "Heavy Cream", "amount": 100, "unit": "ml"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Marinate chicken in yogurt and half the spice mix for at least 1 hour."},
+      {"step_number": 2, "instruction": "Sear marinated chicken in a hot pan until charred, then set aside."},
+      {"step_number": 3, "instruction": "Sauté remaining spice mix, add tomato puree, and simmer 10 minutes."},
+      {"step_number": 4, "instruction": "Stir in cream and the seared chicken, simmer until cooked through."}
+    ],
+    "total_time_minutes": 50,
+    "servings": 4
+  },
+  {
+    "id": "r7",
+    "title": "Beef Bourguignon",
+    "ingredients": [
+      {"name": "Beef Chuck", "amount": 1, "unit": "kg"},
+      {"name": "Red Wine", "amount": 750, "unit": "ml"},
+      {"name": "Bacon Lardons", "amount": 150, "unit": "g"},
+      {"name": "Pearl Onions", "amount": 200, "unit": "g"},
+      {"name": "Carrots", "amount": 3, "unit": "piece"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Brown beef chunks in batches, then set aside."},
+      {"step_number": 2, "instruction": "Render lardons, then sauté onions and carrots."},
+      {"step_number": 3, "instruction": "Return beef to the pot, add wine, and bring to a simmer."},
+      {"step_number": 4, "instruction": "Cover and braise low and slow for 2.5 hours until fork-tender."}
+    ],
+    "total_time_minutes": 180,
+    "servings": 6
+  },
+  {
+    "id": "r8",
+    "title": "Vegetable Pad Thai",
+    "ingredients": [
+      {"name": "Rice Noodles", "amount": 200, "unit": "g"},
+      {"name": "Firm Tofu", "amount": 200, "unit": "g"},
+      {"name": "Bean Sprouts", "amount": 100, "unit": "g"},
+      {"name": "Tamarind Paste", "amount": 2, "unit": "tbsp"},
+      {"name": "Peanuts", "amount": 50, "unit": "g"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Soak rice noodles in warm water until pliable."},
+      {"step_number": 2, "instruction": "Pan-fry tofu until golden, then set aside."},
+      {"step_number": 3, "instruction": "Stir-fry noodles with tamarind sauce, tofu, and bean sprouts."},
+      {"step_number": 4, "instruction": "Top with crushed peanuts before serving."}
+    ],
+    "total_time_minutes": 25,
+    "servings": 3
+  },
+  {
+    "id": "r9",
+    "title": "Lemon Garlic Roast Chicken",
+    "ingredients": [
+      {"name": "Whole Chicken", "amount": 1.5, "unit": "kg"},
+      {"name": "Lemon", "amount": 2, "unit": "piece"},
+      {"name": "Garlic", "amount": 6, "unit": "clove"},
+      {"name": "Butter", "amount": 50, "unit": "g"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Rub chicken with softened butter, salt, and pepper."},
+      {"step_number": 2, "instruction": "Stuff cavity with halved lemons and smashed garlic cloves."},
+      {"step_number": 3, "instruction": "Roast at 200C for about 1 hour 20 minutes until juices run clear."},
+      {"step_number": 4, "instruction": "Rest for 10 minutes before carving."}
+    ],
+    "total_time_minutes": 100,
+    "servings": 4
+  },
+  {
+    "id": "r10",
+    "title": "Black Bean Chili",
+    "ingredients": [
+      {"name": "Black Beans", "amount": 400, "unit": "g"},
+      {"name": "Diced Tomatoes", "amount": 400, "unit": "g"},
+      {"name": "Bell Pepper", "amount": 2, "unit": "piece"},
+      {"name": "Chili Powder", "amount": 2, "unit": "tbsp"},
+      {"name": "Onion", "amount": 1, "unit": "piece"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Sauté onion and bell pepper until softened."},
+      {"step_number": 2, "instruction": "Stir in chili powder and cook 1 minute until fragrant."},
+      {"step_number": 3, "instruction": "Add beans and tomatoes, simmer 25 minutes, stirring occasionally."}
+    ],
+    "total_time_minutes": 35,
+    "servings": 4
+  },
+  {
+    "id": "r11",
+    "title": "Miso Glazed Salmon",
+    "ingredients": [
+      {"name": "Salmon Fillet", "amount": 4, "unit": "piece"},
+      {"name": "White Miso Paste", "amount": 3, "unit": "tbsp"},
+      {"name": "Mirin", "amount": 2, "unit": "tbsp"},
+      {"name": "Soy Sauce", "amount": 1, "unit": "tbsp"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Whisk miso, mirin, and soy sauce into a glaze."},
+      {"step_number": 2, "instruction": "Marinate salmon in the glaze for at least 30 minutes."},
+      {"step_number": 3, "instruction": "Broil salmon until caramelized and just cooked through, about 8 minutes."}
+    ],
+    "total_time_minutes": 45,
+    "servings": 4
+  },
+  {
+    "id": "r12",
+    "title": "Classic Beef Lasagna",
+    "ingredients": [
+      {"name": "Lasagna Sheets", "amount": 12, "unit": "piece"},
+      {"name": "Ground Beef", "amount": 500, "unit": "g"},
+      {"name": "Marinara Sauce", "amount": 700, "unit": "ml"},
+      {"name": "Ricotta", "amount": 400, "unit": "g"},
+      {"name": "Mozzarella", "amount": 300, "unit": "g"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Brown beef and simmer with marinara sauce for 15 minutes."},
+      {"step_number": 2, "instruction": "Layer sheets, meat sauce, and ricotta in a baking dish, repeating."},
+      {"step_number": 3, "instruction": "Top with mozzarella and bake at 190C for 35 minutes."},
+      {"step_number": 4, "instruction": "Rest 10 minutes before slicing."}
+    ],
+    "total_time_minutes": 75,
+    "servings": 6
+  },
+  {
+    "id": "r13",
+    "title": "Shakshuka",
+    "ingredients": [
+      {"name": "Eggs", "amount": 6, "unit": "piece"},
+      {"name": "Crushed Tomatoes", "amount": 800, "unit": "g"},
+      {"name": "Red Bell Pepper", "amount": 1, "unit": "piece"},
+      {"name": "Cumin", "amount": 1, "unit": "tsp"},
+      {"name": "Feta", "amount": 80, "unit": "g"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Sauté bell pepper and cumin until softened."},
+      {"step_number": 2, "instruction": "Add crushed tomatoes and simmer into a thick sauce, about 10 minutes."},
+      {"step_number": 3, "instruction": "Crack eggs into wells in the sauce and cover until whites set."},
+      {"step_number": 4, "instruction": "Crumble feta over the top before serving."}
+    ],
+    "total_time_minutes": 30,
+    "servings": 3
+  },
+  {
+    "id": "r14",
+    "title": "Korean Beef Bibimbap",
+    "ingredients": [
+      {"name": "Ground Beef", "amount": 300, "unit": "g"},
+      {"name": "Cooked Rice", "amount": 3, "unit": "cup"},
+      {"name": "Spinach", "amount": 150, "unit": "g"},
+      {"name": "Carrot", "amount": 1, "unit": "piece"},
+      {"name": "Gochujang", "amount": 2, "unit": "tbsp"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Marinate beef in soy sauce, garlic, and sesame oil, then stir-fry."},
+      {"step_number": 2, "instruction": "Blanch spinach and julienne and sauté the carrot separately."},
+      {"step_number": 3, "instruction": "Arrange rice in bowls topped with beef and vegetables."},
+      {"step_number": 4, "instruction": "Finish each bowl with a fried egg and a spoon of gochujang."}
+    ],
+    "total_time_minutes": 40,
+    "servings": 3
+  },
+  {
+    "id": "r15",
+    "title": "Creamy Tomato Basil Soup",
+    "ingredients": [
+      {"name": "Canned Tomatoes", "amount": 800, "unit": "g"},
+      {"name": "Vegetable Broth", "amount": 500, "unit": "ml"},
+      {"name": "Heavy Cream", "amount": 100, "unit": "ml"},
+      {"name": "Basil Leaves", "amount": 10, "unit": "piece"},
+      {"name": "Garlic", "amount": 3, "unit": "clove"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Sauté garlic until fragrant, then add tomatoes and broth."},
+      {"step_number": 2, "instruction": "Simmer 15 minutes, then blend until smooth."},
+      {"step_number": 3, "instruction": "Stir in cream and torn basil, season to taste."}
+    ],
+    "total_time_minutes": 25,
+    "servings": 4
+  },
+  {
+    "id": "r16",
+    "title": "Garlic Butter Shrimp Scampi",
+    "ingredients": [
+      {"name": "Shrimp", "amount": 500, "unit": "g"},
+      {"name": "Linguine", "amount": 250, "unit": "g"},
+      {"name": "Butter", "amount": 60, "unit": "g"},
+      {"name": "Garlic", "amount": 5, "unit": "clove"},
+      {"name": "White Wine", "amount": 100, "unit": "ml"}
+    ],
+    "steps": [
+      {"step_number": 1, "instruction": "Cook linguine until al dente, reserving some pasta water."},
+      {"step_number": 2, "instruction": "Sauté garlic in butter, then add shrimp and cook until pink."},
+      {"step_number": 3, "instruction": "Deglaze with white wine and reduce slightly."},
+      {"step_number": 4, "instruction": "Toss with pasta, loosening with reserved pasta water."}
+    ],
+    "total_time_minutes": 25,
+    "servings": 3
+  }
+]
