@@ -120,10 +120,12 @@ def make_server_content(
     if audio is not None:
         part = SimpleNamespace(inline_data=SimpleNamespace(data=audio))
         model_turn = SimpleNamespace(parts=[part])
+    input_ns = SimpleNamespace(text=input_transcription) if input_transcription else None
+    output_ns = SimpleNamespace(text=output_transcription) if output_transcription else None
     return SimpleNamespace(
         interrupted=interrupted,
-        input_transcription=SimpleNamespace(text=input_transcription) if input_transcription else None,
-        output_transcription=SimpleNamespace(text=output_transcription) if output_transcription else None,
+        input_transcription=input_ns,
+        output_transcription=output_ns,
         model_turn=model_turn,
     )
 

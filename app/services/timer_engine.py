@@ -7,7 +7,7 @@ assistant can announce it unprompted.
 """
 import asyncio
 import logging
-from typing import Awaitable, Callable, Dict, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Tuple
 
 from ..schemas import KitchenTimer, RecipeState
 from ..state_manager import StateManager

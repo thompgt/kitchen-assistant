@@ -7,6 +7,7 @@ LiveGateway's real-Live connect factory swapped for a fake one — no network
 or API key required.
 """
 import json
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -14,6 +15,22 @@ from fastapi.testclient import TestClient
 import app.main as main_module
 from app.live.gateway import LiveGateway
 from tests.test_gateway import FakeLiveSession, _ConnectCM, make_message, make_tool_call
+
+
+@contextmanager
+def _websocket_session(path: str):
+    """websocket_connect, tolerating the benign portal-teardown race where the
+    fake session's blocked receive() is still being cancelled when TestClient's
+    background ASGI thread winds down after the assertions already ran."""
+    cm = TestClient(main_module.app).websocket_connect(path)
+    ws = cm.__enter__()
+    try:
+        yield ws
+    finally:
+        try:
+            cm.__exit__(None, None, None)
+        except Exception:
+            pass
 
 
 def test_websocket_route_ready_status_and_tool_dispatch(monkeypatch) -> None:
@@ -35,7 +52,7 @@ def test_websocket_route_ready_status_and_tool_dispatch(monkeypatch) -> None:
 
     monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
 
-    with TestClient(main_module.app).websocket_connect("/ws/voice/route-test-1") as ws:
+    with _websocket_session("/ws/voice/route-test-1") as ws:
         envelopes = []
         for _ in range(2):
             envelopes.append(json.loads(ws.receive_text()))
@@ -69,7 +86,7 @@ def test_websocket_route_forwards_interrupted(monkeypatch) -> None:
 
     monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
 
-    with TestClient(main_module.app).websocket_connect("/ws/voice/route-test-2") as ws:
+    with _websocket_session("/ws/voice/route-test-2") as ws:
         envelopes = [json.loads(ws.receive_text()) for _ in range(2)]
 
     assert envelopes[0] == {"type": "session.status", "status": "ready"}
