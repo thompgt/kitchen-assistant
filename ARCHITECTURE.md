@@ -150,7 +150,11 @@ Two clients speak the same WS protocol; the gateway doesn't know or care which o
 
 **ADR-007 — `google-genai` only; retire `google-generativeai`.** The Live API exists only in the new SDK (`client.aio.live`). The deprecated package remains only in scripts and `orchestrator_v2.py`, both rewritten or deleted by the workplan.
 
-**ADR-008 — Vanilla JS client first, React HUD later.** Zero build tooling keeps the demo loop tight; the WS JSON protocol lets the HUD replace the page later without server changes.
+**ADR-008 — Vanilla JS client first, React HUD later.** Zero build tooling keeps the demo loop tight; the WS JSON protocol lets the HUD replace the page later without server changes. Done as of Phase 7: both clients ship and speak the identical protocol.
+
+**ADR-009 — Shared-token auth, not user accounts.** The app is a single-deployment kitchen appliance (one container, LAN or personal use), not multi-tenant SaaS. `APP_AUTH_TOKEN` gates the WS route with one shared secret (`app/auth.py`); unset, access stays open for local/LAN dev — today's default behavior. A full accounts system (registration, per-user DBs, JWT) would be solving a problem this project doesn't have. Multi-*session* isolation already exists for free via `session_id`-keyed `StateManager` state.
+
+**ADR-010 — Single container, Redis opt-in.** `Dockerfile` is a two-stage build (Node stage for the HUD, Python runtime for everything else); `docker-compose.yml` runs one `app` service against the in-memory `StateManager` by default. Redis (ADR-003) only matters once you run multiple replicas needing shared session state — wired as an opt-in `redis` compose profile rather than a hard dependency.
 
 ## Latency Budget (<800 ms glass-to-glass, conversational turns)
 
@@ -216,7 +220,9 @@ kitchen-assistant/
 │   └── live_smoke.py         # Prerecorded-audio smoke test of the gateway
 ├── tests/                    # pytest + pytest-asyncio (fake Live backend)
 ├── notebooks/                # EDA / multimodal experiments
-├── .github/workflows/ci.yml  # Lint + tests, no API key required
+├── .github/workflows/ci.yml  # Lint + tests, frontend build, no API key required
+├── Dockerfile                 # Multi-stage: HUD build + Python runtime
+├── docker-compose.yml         # app service + optional redis profile
 ├── .env.example
 ├── ARCHITECTURE.md           # This file
 └── workplan.md               # Authoritative phased roadmap
@@ -231,3 +237,4 @@ kitchen-assistant/
 | `USE_REDIS` | Enable Redis session store | `false` |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
 | `RECIPES_DB_PATH` | DuckDB recipe database | `data/recipes.db` |
+| `APP_AUTH_TOKEN` | Shared token gating `/ws/voice/{session_id}` (ADR-009) | unset (open access) |

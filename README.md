@@ -29,6 +29,7 @@ One `LiveGateway` instance per WebSocket connection proxies the browser directly
 - **⏱️ Multi-Timer Management**: Set, label, cancel, and list overlapping timers; expiry is announced proactively, unprompted.
 - **⚖️ Dynamic Recipe Scaling & Unit Conversion**: "Double this recipe," F↔C, kg/lb, l/fl oz, etc.
 - **🔎 Recipe Search (RAG)**: Semantic search over a DuckDB + vector-similarity recipe catalog (`gemini-embedding-001`); "find me a mushroom recipe" → load → step-by-step navigation.
+- **📷 Camera Doneness Checks**: Share a camera and ask "is this done?" — frames stream to Gemini Live alongside audio.
 - **🖥️ Two clients**: a dependency-free vanilla JS client (`static/`) and a React/TypeScript HUD (`frontend/`) with a live timer board, instruction card, and scaled ingredient checklist.
 
 ---
@@ -76,6 +77,20 @@ cd frontend && npm run lint && npm run build   # frontend typecheck + lint
 ```
 CI (`.github/workflows/ci.yml`) runs all of the above on every push/PR.
 
+### Auth (optional)
+The app is open-access by default (fine for local/LAN use). To gate it before exposing it publicly, set `APP_AUTH_TOKEN` in `.env` and share the URL with the token attached: `https://host/?token=<value>`. Both clients forward it to the WebSocket automatically. This is a single shared secret, not a user-account system — proportionate to a single-deployment kitchen appliance. Concurrent users already get independent state via `session_id`, with no auth required for that.
+
+### Deployment (Docker)
+```bash
+docker build -t kitchen-assistant .
+docker run -p 8000:8000 --env-file .env kitchen-assistant
+```
+Or with Compose (mounts `data/` for editing the recipe catalog without a rebuild):
+```bash
+docker compose up --build
+```
+Redis is optional and only relevant if you run multiple replicas needing shared session state — bring it up with `docker compose --profile redis up` and set `USE_REDIS=true`, `REDIS_URL=redis://redis:6379` in `.env`. A single container is fine with the in-memory default.
+
 ---
 
 ## 📁 Layout
@@ -83,6 +98,7 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every push/PR.
 | Path | Purpose |
 |---|---|
 | `app/main.py` | FastAPI app, `/ws/voice/{session_id}` route |
+| `app/auth.py` | `APP_AUTH_TOKEN` shared-token gate for the WS route |
 | `app/live/gateway.py` | `LiveGateway` — browser WS ↔ Gemini Live proxy, one instance per connection |
 | `app/tools/` | Cooking tools (`cooking_tools.py`) + Gemini `FunctionDeclaration`s and dispatch (`registry.py`) |
 | `app/services/timer_engine.py` | Real asyncio countdown timers with expiry callbacks |
@@ -100,9 +116,7 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every push/PR.
 
 ## 🗺️ Roadmap
 
-The phased build (repo hygiene → state hardening → Live migration → browser client → timers → RAG → tests/CI) is complete; see [`workplan.md`](workplan.md) for the full history. Remaining backlog (unscheduled):
-- Multimodal camera doneness checks (Live API video frames)
-- Auth / multi-user + a real deployment story
+The full phased build — repo hygiene, state hardening, Live migration, browser clients, timers, RAG, tests/CI, the React HUD, camera doneness checks, and auth/deployment — is complete; see [`workplan.md`](workplan.md) for the full history.
 
 ---
 
@@ -114,6 +128,7 @@ The phased build (repo hygiene → state hardening → Live migration → browse
 - **Frontend**: Vanilla JS client + a React/TypeScript/Tailwind/Zustand HUD
 - **Package managers**: Poetry (backend), npm (frontend)
 - **CI**: GitHub Actions — ruff, pytest, frontend build
+- **Deployment**: Docker (multi-stage build), docker-compose, optional Redis
 
 ---
 
