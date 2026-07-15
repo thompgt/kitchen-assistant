@@ -64,7 +64,11 @@ SDK entry points: `google.genai.Client(api_key=...)`, then `client.aio.live.conn
 
 Two concurrent asyncio tasks per session:
 
-1. **Uplink**: browser WS → `send_realtime_input`.
+1. **Uplink**: browser WS → `send_realtime_input`. Binary frames are audio
+   (`send_realtime_input(audio=...)`); JSON `user.text` and `video.frame`
+   envelopes map to `send_realtime_input(text=...)` and
+   `send_realtime_input(video=types.Blob(...))` respectively — the latter
+   feeds camera frames to the model for doneness checks ("is this done?").
 2. **Downlink**: async-iterate `session.receive()` and route:
    - audio parts → binary frames to browser
    - `input_transcription` / `output_transcription` → JSON `transcript.user` / `transcript.agent`
@@ -75,11 +79,14 @@ Two concurrent asyncio tasks per session:
 
 **Reconnection contract**: on GoAway or Live-side disconnect, reconnect with the resumption handle without dropping the browser WS. The browser only sees `{"type":"session.status","state":"reconnecting"|"ready"}`.
 
-**Browser-facing WS protocol** (vendor-neutral by design — a future React HUD replaces the page without server changes):
+**Browser-facing WS protocol** (vendor-neutral by design — both the vanilla
+client and the React HUD speak it unchanged):
 
 | Frame | Direction | Meaning |
 |---|---|---|
 | binary | both | Audio (16 kHz up, 24 kHz down) |
+| `user.text` | client → server | Typed input, used in place of the mic |
+| `video.frame` | client → server | Base64 JPEG camera frame (`data`, `mime_type`), throttled client-side (~1.5s); forwarded via `send_realtime_input(video=...)` for doneness checks |
 | `transcript.user` / `transcript.agent` | server → client | Live transcription of each side |
 | `timer.update` / `timer.expired` | server → client | Timer lifecycle |
 | `interrupted` | server → client | Flush playback queue (barge-in) |
@@ -119,9 +126,13 @@ Owns real `asyncio.create_task` countdowns keyed by `(session_id, timer_id)`; su
 
 The gateway hands the engine a callback pair at session start; the engine never imports the gateway (no cycles). Tasks are cancelled on session disconnect.
 
-### Browser client — `static/` (new), served via FastAPI `StaticFiles`
+### Browser clients
 
-`static/index.html` + `static/app.js` + `static/pcm-worklet.js`. AudioWorklet captures mic at 16 kHz mono, Float32→Int16, ships ~20–40 ms binary frames. Playback: queue of 24 kHz PCM16 chunks into `AudioContext({sampleRate: 24000})`; on `interrupted`, flush the queue immediately. UI: transcript pane, active-timer chips with client-side countdown, connection status. No framework, no build step. The React HUD (`frontend_plan.md`) is explicitly deferred.
+Two clients speak the same WS protocol; the gateway doesn't know or care which one is connected.
+
+**Vanilla client — `static/`**, served via FastAPI `StaticFiles` at `/`. `index.html` + `app.js` + `pcm-worklet.js`. AudioWorklet captures mic at 16 kHz mono, Float32→Int16, ships ~20–40 ms binary frames. Playback: queue of 24 kHz PCM16 chunks into `AudioContext({sampleRate: 24000})`; on `interrupted`, flush the queue immediately. Camera toggle captures a JPEG frame every ~1.5s via canvas and sends it as `video.frame`. UI: transcript pane, active-timer chips with client-side countdown, connection status, camera preview. No framework, no build step.
+
+**React HUD — `frontend/`** (Vite + TypeScript + Tailwind + Zustand, per `frontend_plan.md`), served at `/hud` via `StaticFiles(html=True)` once built (`npm run build`). Mirrors the vanilla client's audio/camera capture and playback logic in a `useVoiceSocket` hook, with a Zustand store mirroring `RecipeState`. Components: `StatusBar`, `InstructionCard`, `IngredientChecklist` (scaled by `servings_multiplier`), `ActiveTimerBoard` (circular countdown rings), `TranscriptPane`, `CameraPreview`, `MicButton`. Dark, high-contrast styling per the kitchen-specific design principles in `frontend_plan.md`.
 
 ## Design Decisions (ADRs)
 
@@ -187,12 +198,18 @@ kitchen-assistant/
 │   └── tools/
 │       ├── cooking_tools.py  # Tool implementations (stateless, injected state)
 │       └── registry.py       # FunctionDeclarations + dispatch
-├── static/                   # Vanilla JS voice client
+├── static/                   # Vanilla JS voice client, served at /
 │   ├── index.html
 │   ├── app.js
 │   └── pcm-worklet.js
+├── frontend/                  # React/TS/Tailwind/Zustand HUD, served at /hud once built
+│   └── src/
+│       ├── hooks/useVoiceSocket.ts
+│       ├── store/useSessionStore.ts
+│       └── components/
 ├── data/
-│   └── recipes.db            # DuckDB (moved from notebooks/)
+│   ├── recipes.db             # DuckDB (moved from notebooks/)
+│   └── recipes_seed.json      # Source-of-truth recipe catalog
 ├── scripts/
 │   ├── ingest_recipes.py     # Seed recipes (new SDK, new path)
 │   ├── setup_vector_search.py
