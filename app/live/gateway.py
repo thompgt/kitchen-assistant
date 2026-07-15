@@ -8,6 +8,7 @@ The Gemini connection is produced by a connect factory so tests can inject a
 fake Live backend (Phase 6) instead of the real `client.aio.live.connect`.
 """
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -31,7 +32,10 @@ SYSTEM_INSTRUCTION = (
     "You are an Executive Sous-Chef voice assistant for a busy kitchen. "
     "Be concise, professional, and efficiency-focused — no conversational "
     "filler. Help the chef manage recipes, timers, unit conversions, and "
-    "step-by-step navigation using your tools. Announce tool results briefly."
+    "step-by-step navigation using your tools. Announce tool results briefly. "
+    "If the chef shares their camera, use it to answer doneness questions "
+    "('is this done?', 'is it browned enough?') from what you see — describe "
+    "what you observe and give a direct verdict."
 )
 
 # A connect factory returns the async context manager normally produced by
@@ -147,13 +151,21 @@ class LiveGateway:
             text = message.get("text")
             if text is not None:
                 envelope = json.loads(text)
-                if envelope.get("type") == "user.text":
+                envelope_type = envelope.get("type")
+                if envelope_type == "user.text":
                     await session.send_realtime_input(text=envelope["text"])
+                elif envelope_type == "video.frame":
+                    await session.send_realtime_input(
+                        video=types.Blob(
+                            data=base64.b64decode(envelope["data"]),
+                            mime_type=envelope.get("mime_type", "image/jpeg"),
+                        )
+                    )
                 else:
                     await self._send_json(
                         {
                             "type": "error",
-                            "message": f"Unknown client envelope '{envelope.get('type')}'.",
+                            "message": f"Unknown client envelope '{envelope_type}'.",
                         }
                     )
 

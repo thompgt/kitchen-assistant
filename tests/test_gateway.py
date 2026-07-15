@@ -7,6 +7,7 @@ capture, GoAway-triggered reconnect — is exercised with no network or API
 key, matching the Phase 6 "no secrets needed" CI goal.
 """
 import asyncio
+import base64
 import json
 from datetime import datetime
 from types import SimpleNamespace
@@ -189,6 +190,64 @@ class ScriptedWebSocket(FakeWebSocket):
         if self._call_count >= self._disconnect_after:
             return {"type": "websocket.disconnect"}
         await asyncio.Event().wait()  # block forever: no more client input this session
+
+
+# --- _uplink protocol coverage --------------------------------------------------
+
+
+class QueuedWebSocket(FakeWebSocket):
+    """Replays a fixed list of receive() messages, then disconnects."""
+
+    def __init__(self, messages: List[Dict[str, Any]]):
+        super().__init__()
+        self._messages = list(messages) + [{"type": "websocket.disconnect"}]
+        self._index = 0
+
+    async def receive(self) -> Dict[str, Any]:
+        message = self._messages[self._index]
+        self._index += 1
+        return message
+
+
+async def test_uplink_forwards_audio_text_and_video_frames(
+    state_manager: StateManager,
+) -> None:
+    ws = QueuedWebSocket(
+        [
+            {"bytes": b"\x01\x02"},
+            {"text": json.dumps({"type": "user.text", "text": "hello"})},
+            {
+                "text": json.dumps(
+                    {
+                        "type": "video.frame",
+                        "data": base64.b64encode(b"fake-jpeg-bytes").decode(),
+                        "mime_type": "image/jpeg",
+                    }
+                )
+            },
+        ]
+    )
+    gateway = _make_gateway(state_manager, ws)
+    session = FakeSession()
+
+    await gateway._uplink(session)
+
+    assert session.sent_realtime[0]["audio"].data == b"\x01\x02"
+    assert session.sent_realtime[1]["text"] == "hello"
+    video_blob = session.sent_realtime[2]["video"]
+    assert video_blob.data == b"fake-jpeg-bytes"
+    assert video_blob.mime_type == "image/jpeg"
+
+
+async def test_uplink_unknown_envelope_sends_error(state_manager: StateManager) -> None:
+    ws = QueuedWebSocket([{"text": json.dumps({"type": "bogus"})}])
+    gateway = _make_gateway(state_manager, ws)
+    session = FakeSession()
+
+    await gateway._uplink(session)
+
+    envelopes = [json.loads(text) for text in ws.sent_text]
+    assert any(e["type"] == "error" and "bogus" in e["message"] for e in envelopes)
 
 
 # --- _downlink protocol coverage ----------------------------------------------
