@@ -105,7 +105,7 @@ Phases 3, 4, and 5 are independent of each other and can run in any order or in 
 
 **Acceptance:** CI green on GitHub with no `GOOGLE_API_KEY` secret; gateway logic covered by fake-backend tests.
 
-## Phase 7 — Backlog (not scheduled)
+## Phase 7 — Backlog (complete)
 
 - ~~React HUD per `frontend_plan.md`.~~ Done — `frontend/` (Vite/React/TS/Tailwind/
   Zustand), served at `/hud` when built; vanilla client at `/` untouched. Verified
@@ -119,7 +119,12 @@ Phases 3, 4, and 5 are independent of each other and can run in any order or in 
   catalog now lives in `data/recipes_seed.json` (16 recipes), `scripts/ingest_recipes.py`
   is idempotent and rebuilds the schema from scratch, `scripts/setup_vector_search.py`
   batch-embeds only rows missing a vector.
-- Auth / multi-user; deployment story (single container; Redis becomes relevant here).
+- ~~Auth / multi-user; deployment story (single container; Redis becomes relevant here).~~ Done —
+  `APP_AUTH_TOKEN` shared-token gate on the WS route (`app/auth.py`, ADR-009; open access
+  when unset); per-`session_id` state isolation already covers concurrent multi-user
+  sessions with no extra work. `Dockerfile` (multi-stage: HUD build + Python runtime) and
+  `docker-compose.yml` (app service + opt-in `redis` profile, ADR-010) — built, run, and
+  health-checked locally, including verifying the auth gate flips on inside the container.
 
 ---
 
