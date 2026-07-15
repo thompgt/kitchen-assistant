@@ -6,12 +6,14 @@ let nextLineId = 0
 interface SessionStore {
   status: ConnectionStatus
   micLive: boolean
+  cameraLive: boolean
   transcript: TranscriptLine[]
   recipeState: RecipeState | null
   timers: Record<string, KitchenTimer>
 
   setStatus: (status: ConnectionStatus) => void
   setMicLive: (live: boolean) => void
+  setCameraLive: (live: boolean) => void
   appendTranscript: (role: TranscriptRole, text: string, opts?: { newLine?: boolean }) => void
   resetTranscriptCursor: () => void
   applySnapshot: (state: RecipeState) => void
@@ -26,12 +28,14 @@ let lastRole: TranscriptRole | null = null
 export const useSessionStore = create<SessionStore>((set) => ({
   status: 'connecting',
   micLive: false,
+  cameraLive: false,
   transcript: [],
   recipeState: null,
   timers: {},
 
   setStatus: (status) => set({ status }),
   setMicLive: (micLive) => set({ micLive }),
+  setCameraLive: (cameraLive) => set({ cameraLive }),
 
   appendTranscript: (role, text, opts) =>
     set((s) => {

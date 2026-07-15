@@ -3,11 +3,13 @@ import { useSessionStore } from '../store/useSessionStore'
 
 interface MicButtonProps {
   onToggle: () => void
+  onToggleCamera: () => void
   onSendText: (text: string) => void
 }
 
-export function MicButton({ onToggle, onSendText }: MicButtonProps) {
+export function MicButton({ onToggle, onToggleCamera, onSendText }: MicButtonProps) {
   const micLive = useSessionStore((s) => s.micLive)
+  const cameraLive = useSessionStore((s) => s.cameraLive)
   const [text, setText] = useState('')
 
   return (
@@ -21,6 +23,16 @@ export function MicButton({ onToggle, onSendText }: MicButtonProps) {
         }`}
       >
         {micLive ? '⏹ Stop' : '🎤 Start'}
+      </button>
+      <button
+        onClick={onToggleCamera}
+        className={`rounded-full border px-4 py-3 text-sm font-semibold transition-colors ${
+          cameraLive
+            ? 'border-kitchen-accent text-kitchen-accent'
+            : 'border-white/20 text-white/70 hover:border-white/40'
+        }`}
+      >
+        {cameraLive ? '⏹ Camera' : '📷 Camera'}
       </button>
       <input
         value={text}

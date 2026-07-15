@@ -10,6 +10,8 @@ const statusText = document.getElementById("status-text");
 const transcriptEl = document.getElementById("transcript");
 const timersEl = document.getElementById("timers");
 const micBtn = document.getElementById("mic-btn");
+const camBtn = document.getElementById("cam-btn");
+const camPreview = document.getElementById("cam-preview");
 const textInput = document.getElementById("text-input");
 
 let ws = null;
@@ -86,7 +88,7 @@ function handleEnvelope(envelope) {
 function connect() {
   ws = new WebSocket(wsUrl);
   ws.binaryType = "arraybuffer";
-  ws.onopen = () => { micBtn.disabled = false; };
+  ws.onopen = () => { micBtn.disabled = false; camBtn.disabled = false; };
   ws.onmessage = (event) => {
     if (event.data instanceof ArrayBuffer) {
       enqueueAudio(event.data);
@@ -97,6 +99,7 @@ function connect() {
   ws.onclose = () => {
     setStatus("closed");
     micBtn.disabled = true;
+    camBtn.disabled = true;
   };
 }
 connect();
@@ -140,6 +143,60 @@ async function stopMic() {
 }
 
 micBtn.addEventListener("click", () => (captureCtx ? stopMic() : startMic()));
+
+// --- camera: throttled JPEG frames for doneness checks ---------------------
+
+const FRAME_INTERVAL_MS = 1500;
+let camStream = null;
+let camFrameTimer = null;
+const camCanvas = document.createElement("canvas");
+
+async function startCamera() {
+  camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  camPreview.srcObject = camStream;
+  camPreview.classList.add("live");
+  camBtn.textContent = "⏹ Camera";
+  camBtn.classList.add("live");
+
+  camFrameTimer = setInterval(() => {
+    if (!ws || ws.readyState !== 1 || camPreview.videoWidth === 0) return;
+    camCanvas.width = camPreview.videoWidth;
+    camCanvas.height = camPreview.videoHeight;
+    camCanvas.getContext("2d").drawImage(camPreview, 0, 0);
+    camCanvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result.split(",")[1];
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({ type: "video.frame", data: base64, mime_type: "image/jpeg" }));
+          }
+        };
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      0.7
+    );
+  }, FRAME_INTERVAL_MS);
+}
+
+function stopCamera() {
+  if (camFrameTimer) {
+    clearInterval(camFrameTimer);
+    camFrameTimer = null;
+  }
+  if (camStream) {
+    for (const track of camStream.getTracks()) track.stop();
+    camStream = null;
+  }
+  camPreview.srcObject = null;
+  camPreview.classList.remove("live");
+  camBtn.textContent = "📷 Camera";
+  camBtn.classList.remove("live");
+}
+
+camBtn.addEventListener("click", () => (camStream ? stopCamera() : startCamera()));
 
 // --- playback: 24 kHz queue with barge-in flush ---------------------------
 

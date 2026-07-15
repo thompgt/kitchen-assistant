@@ -4,10 +4,11 @@ import { IngredientChecklist } from './components/IngredientChecklist'
 import { ActiveTimerBoard } from './components/ActiveTimerBoard'
 import { TranscriptPane } from './components/TranscriptPane'
 import { MicButton } from './components/MicButton'
+import { CameraPreview } from './components/CameraPreview'
 import { useVoiceSocket } from './hooks/useVoiceSocket'
 
 export default function App() {
-  const { sendText, toggleMic } = useVoiceSocket()
+  const { sendText, toggleMic, toggleCamera, camVideoRef } = useVoiceSocket()
 
   return (
     <div className="flex min-h-screen flex-col bg-kitchen-bg text-white">
@@ -20,7 +21,8 @@ export default function App() {
         </div>
         <TranscriptPane />
       </main>
-      <MicButton onToggle={toggleMic} onSendText={sendText} />
+      <CameraPreview videoRef={camVideoRef} />
+      <MicButton onToggle={toggleMic} onToggleCamera={toggleCamera} onSendText={sendText} />
     </div>
   )
 }

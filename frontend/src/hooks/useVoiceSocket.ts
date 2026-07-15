@@ -10,15 +10,22 @@ function makeSessionId(): string {
   return crypto.randomUUID().slice(0, 8)
 }
 
+const CAMERA_FRAME_INTERVAL_MS = 1500
+
 export function useVoiceSocket() {
   const wsRef = useRef<WebSocket | null>(null)
   const captureCtxRef = useRef<AudioContext | null>(null)
   const playbackCtxRef = useRef<AudioContext | null>(null)
   const nextStartTimeRef = useRef(0)
   const scheduledSourcesRef = useRef<AudioBufferSourceNode[]>([])
+  const camStreamRef = useRef<MediaStream | null>(null)
+  const camVideoRef = useRef<HTMLVideoElement | null>(null)
+  const camCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const camTimerRef = useRef<number | null>(null)
 
   const setStatus = useSessionStore((s) => s.setStatus)
   const setMicLive = useSessionStore((s) => s.setMicLive)
+  const setCameraLive = useSessionStore((s) => s.setCameraLive)
   const appendTranscript = useSessionStore((s) => s.appendTranscript)
   const resetTranscriptCursor = useSessionStore((s) => s.resetTranscriptCursor)
   const applySnapshot = useSessionStore((s) => s.applySnapshot)
@@ -160,5 +167,67 @@ export function useVoiceSocket() {
     }
   }, [startMic, stopMic])
 
-  return { sendText, toggleMic }
+  // --- camera: throttled JPEG frames for doneness checks -----------------
+
+  const startCamera = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+    })
+    camStreamRef.current = stream
+    const video = camVideoRef.current
+    if (video) video.srcObject = stream
+
+    if (!camCanvasRef.current) camCanvasRef.current = document.createElement('canvas')
+    const canvas = camCanvasRef.current
+
+    camTimerRef.current = window.setInterval(() => {
+      const ws = wsRef.current
+      const v = camVideoRef.current
+      if (!ws || ws.readyState !== WebSocket.OPEN || !v || v.videoWidth === 0) return
+      canvas.width = v.videoWidth
+      canvas.height = v.videoHeight
+      canvas.getContext('2d')?.drawImage(v, 0, 0)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const result = reader.result as string
+            const base64 = result.split(',')[1]
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'video.frame', data: base64, mime_type: 'image/jpeg' }))
+            }
+          }
+          reader.readAsDataURL(blob)
+        },
+        'image/jpeg',
+        0.7
+      )
+    }, CAMERA_FRAME_INTERVAL_MS)
+
+    setCameraLive(true)
+  }, [setCameraLive])
+
+  const stopCamera = useCallback(() => {
+    if (camTimerRef.current !== null) {
+      clearInterval(camTimerRef.current)
+      camTimerRef.current = null
+    }
+    if (camStreamRef.current) {
+      for (const track of camStreamRef.current.getTracks()) track.stop()
+      camStreamRef.current = null
+    }
+    if (camVideoRef.current) camVideoRef.current.srcObject = null
+    setCameraLive(false)
+  }, [setCameraLive])
+
+  const toggleCamera = useCallback(() => {
+    if (camStreamRef.current) {
+      stopCamera()
+    } else {
+      void startCamera()
+    }
+  }, [startCamera, stopCamera])
+
+  return { sendText, toggleMic, toggleCamera, camVideoRef }
 }

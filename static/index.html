@@ -49,6 +49,17 @@
       flex: 1; border: none; border-radius: 8px; padding: 10px 12px;
       background: var(--bg); color: var(--text); font-size: 15px;
     }
+    #cam-btn {
+      border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer;
+      background: var(--panel); border: 1px solid var(--muted); color: var(--text); font-size: 15px;
+    }
+    #cam-btn.live { border-color: var(--accent); color: var(--accent); }
+    #cam-btn:disabled { color: var(--muted); cursor: not-allowed; }
+    #cam-preview {
+      position: fixed; bottom: 70px; right: 16px; width: 160px; border-radius: 8px;
+      border: 1px solid var(--accent); display: none; background: #000;
+    }
+    #cam-preview.live { display: block; }
   </style>
 </head>
 <body>
@@ -59,8 +70,10 @@
   </header>
   <div id="timers"></div>
   <main id="transcript"></main>
+  <video id="cam-preview" autoplay muted playsinline></video>
   <footer>
     <button id="mic-btn" disabled>🎤 Start</button>
+    <button id="cam-btn" disabled>📷 Camera</button>
     <input id="text-input" type="text" placeholder="Type to the sous-chef (or use the mic)…" autocomplete="off">
   </footer>
   <script src="/static/app.js"></script>
