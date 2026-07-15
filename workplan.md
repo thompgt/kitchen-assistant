@@ -110,7 +110,11 @@ Phases 3, 4, and 5 are independent of each other and can run in any order or in 
 - ~~React HUD per `frontend_plan.md`.~~ Done — `frontend/` (Vite/React/TS/Tailwind/
   Zustand), served at `/hud` when built; vanilla client at `/` untouched. Verified
   end-to-end (search → load → scale → set-timer) with a headless-browser driver.
-- Multimodal camera doneness checks (from `notebooks/02_multimodal_practice.ipynb`; Live API video frames).
+- ~~Multimodal camera doneness checks (Live API video frames).~~ Done — a new
+  `video.frame` client→server envelope (base64 JPEG, ~1.5s throttle) is forwarded
+  by `LiveGateway` via `send_realtime_input(video=...)`; both clients have a
+  Camera toggle + preview. Verified end-to-end with a headless-browser fake
+  camera device — the model correctly describes the streamed frames.
 - ~~Real recipe ingestion pipeline (beyond 4 hardcoded recipes; batch embeddings).~~ Done —
   catalog now lives in `data/recipes_seed.json` (16 recipes), `scripts/ingest_recipes.py`
   is idempotent and rebuilds the schema from scratch, `scripts/setup_vector_search.py`
