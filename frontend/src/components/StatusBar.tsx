@@ -1,10 +1,12 @@
 import { useSessionStore } from '../store/useSessionStore'
 
 const STATUS_COLOR: Record<string, string> = {
+  ready: 'bg-kitchen-ok',
   listening: 'bg-kitchen-ok',
   thinking: 'bg-kitchen-accent animate-pulse',
   speaking: 'bg-kitchen-accent',
   connecting: 'bg-gray-500 animate-pulse',
+  reconnecting: 'bg-gray-500 animate-pulse',
   closed: 'bg-kitchen-danger',
 }
 
