@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data # persist/edit the recipe catalog without rebuilding
+    restart: unless-stopped
+
+  # Only needed for multi-replica deployments (shared session state across
+  # containers). Single-container use is fine with the in-memory default —
+  # leave USE_REDIS unset/false in .env and skip this profile.
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  redis-data:
