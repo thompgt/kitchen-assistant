@@ -3,7 +3,12 @@
 // carry the envelopes documented in ARCHITECTURE.md.
 
 const sessionId = crypto.randomUUID().slice(0, 8);
-const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/voice/${sessionId}`;
+// If the page was loaded with ?token=..., forward it to the WS route — lets a
+// deployer gate access with APP_AUTH_TOKEN by sharing "https://host/?token=...".
+const authToken = new URLSearchParams(location.search).get("token");
+const wsUrl =
+  `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/voice/${sessionId}` +
+  (authToken ? `?token=${encodeURIComponent(authToken)}` : "");
 
 const statusDot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
