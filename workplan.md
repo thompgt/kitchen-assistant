@@ -107,7 +107,9 @@ Phases 3, 4, and 5 are independent of each other and can run in any order or in 
 
 ## Phase 7 — Backlog (not scheduled)
 
-- React HUD per `frontend_plan.md` (the WS protocol is already compatible).
+- ~~React HUD per `frontend_plan.md`.~~ Done — `frontend/` (Vite/React/TS/Tailwind/
+  Zustand), served at `/hud` when built; vanilla client at `/` untouched. Verified
+  end-to-end (search → load → scale → set-timer) with a headless-browser driver.
 - Multimodal camera doneness checks (from `notebooks/02_multimodal_practice.ipynb`; Live API video frames).
 - ~~Real recipe ingestion pipeline (beyond 4 hardcoded recipes; batch embeddings).~~ Done —
   catalog now lives in `data/recipes_seed.json` (16 recipes), `scripts/ingest_recipes.py`
