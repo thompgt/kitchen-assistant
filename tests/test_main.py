@@ -10,7 +10,9 @@ import json
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 import app.main as main_module
 from app.live.gateway import LiveGateway
@@ -91,3 +93,32 @@ def test_websocket_route_forwards_interrupted(monkeypatch) -> None:
 
     assert envelopes[0] == {"type": "session.status", "status": "ready"}
     assert envelopes[1] == {"type": "interrupted"}
+
+
+def test_websocket_route_rejects_missing_or_wrong_token(monkeypatch) -> None:
+    monkeypatch.setenv("APP_AUTH_TOKEN", "secret-123")
+    session = FakeLiveSession(block_after=True)
+
+    def fake_factory(self) -> _ConnectCM:
+        return _ConnectCM(session)
+
+    monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with _websocket_session("/ws/voice/route-test-3") as ws:
+            ws.receive_text()
+    assert exc_info.value.code == 4001
+
+
+def test_websocket_route_accepts_correct_token(monkeypatch) -> None:
+    monkeypatch.setenv("APP_AUTH_TOKEN", "secret-123")
+    session = FakeLiveSession(block_after=True)
+
+    def fake_factory(self) -> _ConnectCM:
+        return _ConnectCM(session)
+
+    monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
+
+    with _websocket_session("/ws/voice/route-test-4?token=secret-123") as ws:
+        envelope = json.loads(ws.receive_text())
+    assert envelope == {"type": "session.status", "status": "ready"}

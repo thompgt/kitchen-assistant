@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth import auth_enabled, verify_token
 from .live.gateway import LiveGateway
 from .services.recipe_store import RecipeStore
 from .services.timer_engine import TimerEngine
@@ -44,8 +46,14 @@ app.add_middleware(
 
 
 @app.websocket("/ws/voice/{session_id}")
-async def voice_websocket(websocket: WebSocket, session_id: str) -> None:
+async def voice_websocket(
+    websocket: WebSocket, session_id: str, token: Optional[str] = None
+) -> None:
     await websocket.accept()
+    if not verify_token(token):
+        logger.warning("WebSocket rejected for session %s: invalid or missing token", session_id)
+        await websocket.close(code=4001, reason="Invalid or missing token")
+        return
     logger.info("WebSocket connected for session %s", session_id)
     # One gateway per connection: no shared conversation state across clients.
     gateway = LiveGateway(
@@ -68,6 +76,7 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "redis_connected": state_manager.use_redis,
+        "auth_enabled": auth_enabled(),
     }
 
 
