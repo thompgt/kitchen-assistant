@@ -126,8 +126,10 @@ def main() -> None:
 
     # ---- row B: tool registry --------------------------------------------
     box(ax, 6.9, 4.35, 10.5, 1.65, "ToolRegistry · app/tools/registry.py",
-        ["FunctionDeclaration ⇄ async callable · session_id and services injected at dispatch, never model-visible",
-         "set_kitchen_timer · cancel_timer · list_timers · convert_units · scale_recipe · navigate_steps · search_recipes · load_recipe"],
+        ["FunctionDeclaration ⇄ async callable · session_id and services injected "
+         "at dispatch, never model-visible",
+         "set_kitchen_timer · cancel_timer · list_timers · convert_units · "
+         "scale_recipe · navigate_steps · search_recipes · load_recipe"],
         face=TOOL, edge=TOOL_EDGE, body_size=8.8)
 
     arrow(ax, [(15.1, 6.5), (15.1, 6.0)], "tool_call", (14.45, 6.25))

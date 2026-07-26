@@ -1,0 +1,278 @@
+{
+  "prompts": [
+    "Find me a mushroom recipe and load it.",
+    "Double it, then read me the current step.",
+    "Set a nine minute timer for the risotto and a three minute one for the garlic."
+  ],
+  "envelopes": [
+    {
+      "type": "session.status",
+      "status": "ready"
+    },
+    {
+      "type": "state.snapshot",
+      "state": {
+        "session_id": "screenshot-demo",
+        "recipe_id": "r2",
+        "recipe_metadata": {
+          "id": "r2",
+          "title": "Mushroom Risotto",
+          "description": null,
+          "ingredients": [
+            {
+              "name": "Arborio Rice",
+              "amount": 1.0,
+              "unit": "cup"
+            },
+            {
+              "name": "Mushrooms",
+              "amount": 250.0,
+              "unit": "g"
+            },
+            {
+              "name": "Vegetable Broth",
+              "amount": 500.0,
+              "unit": "ml"
+            },
+            {
+              "name": "Onion",
+              "amount": 1.0,
+              "unit": "piece"
+            }
+          ],
+          "steps": [
+            {
+              "step_number": 1,
+              "instruction": "Saut\u00e9 onions and mushrooms until soft.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 2,
+              "instruction": "Add rice and toast for 2 minutes.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 3,
+              "instruction": "Add broth ladle by ladle, stirring constantly.",
+              "duration_minutes": null
+            }
+          ],
+          "total_time_minutes": 45
+        },
+        "current_step_index": 0,
+        "active_timers": {},
+        "servings_multiplier": 1.0,
+        "last_updated": "2026-07-25T18:29:17.286977"
+      }
+    },
+    {
+      "type": "transcript.agent",
+      "text": "Mushroom Risotto"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " loaded."
+    },
+    {
+      "type": "transcript.agent",
+      "text": " First"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " step:"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " Saut\u00e9"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " onions"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " and mushrooms"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " until"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " soft."
+    },
+    {
+      "type": "state.snapshot",
+      "state": {
+        "session_id": "screenshot-demo",
+        "recipe_id": "r2",
+        "recipe_metadata": {
+          "id": "r2",
+          "title": "Mushroom Risotto",
+          "description": null,
+          "ingredients": [
+            {
+              "name": "Arborio Rice",
+              "amount": 1.0,
+              "unit": "cup"
+            },
+            {
+              "name": "Mushrooms",
+              "amount": 250.0,
+              "unit": "g"
+            },
+            {
+              "name": "Vegetable Broth",
+              "amount": 500.0,
+              "unit": "ml"
+            },
+            {
+              "name": "Onion",
+              "amount": 1.0,
+              "unit": "piece"
+            }
+          ],
+          "steps": [
+            {
+              "step_number": 1,
+              "instruction": "Saut\u00e9 onions and mushrooms until soft.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 2,
+              "instruction": "Add rice and toast for 2 minutes.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 3,
+              "instruction": "Add broth ladle by ladle, stirring constantly.",
+              "duration_minutes": null
+            }
+          ],
+          "total_time_minutes": 45
+        },
+        "current_step_index": 0,
+        "active_timers": {},
+        "servings_multiplier": 1.0,
+        "last_updated": "2026-07-25T18:29:39.705255"
+      }
+    },
+    {
+      "type": "transcript.agent",
+      "text": "Mushroom Risotto"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " is loaded"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " and scaled."
+    },
+    {
+      "type": "transcript.agent",
+      "text": " Step"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " 1:"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " Saut\u00e9"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " onions"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " and mushrooms"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " until"
+    },
+    {
+      "type": "transcript.agent",
+      "text": " soft."
+    },
+    {
+      "type": "state.snapshot",
+      "state": {
+        "session_id": "screenshot-demo",
+        "recipe_id": "r2",
+        "recipe_metadata": {
+          "id": "r2",
+          "title": "Mushroom Risotto",
+          "description": null,
+          "ingredients": [
+            {
+              "name": "Arborio Rice",
+              "amount": 1.0,
+              "unit": "cup"
+            },
+            {
+              "name": "Mushrooms",
+              "amount": 250.0,
+              "unit": "g"
+            },
+            {
+              "name": "Vegetable Broth",
+              "amount": 500.0,
+              "unit": "ml"
+            },
+            {
+              "name": "Onion",
+              "amount": 1.0,
+              "unit": "piece"
+            }
+          ],
+          "steps": [
+            {
+              "step_number": 1,
+              "instruction": "Saut\u00e9 onions and mushrooms until soft.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 2,
+              "instruction": "Add rice and toast for 2 minutes.",
+              "duration_minutes": null
+            },
+            {
+              "step_number": 3,
+              "instruction": "Add broth ladle by ladle, stirring constantly.",
+              "duration_minutes": null
+            }
+          ],
+          "total_time_minutes": 45
+        },
+        "current_step_index": 0,
+        "active_timers": {
+          "2936ff8f": {
+            "id": "2936ff8f",
+            "label": "risotto",
+            "duration_seconds": 540,
+            "start_time": "2026-07-25T18:30:03.002264",
+            "remaining_seconds": 540,
+            "is_active": true
+          },
+          "840e7611": {
+            "id": "840e7611",
+            "label": "garlic",
+            "duration_seconds": 180,
+            "start_time": "2026-07-25T18:30:03.002916",
+            "remaining_seconds": 180,
+            "is_active": true
+          }
+        },
+        "servings_multiplier": 2.0,
+        "last_updated": "2026-07-25T18:30:03.003073"
+      }
+    },
+    {
+      "type": "transcript.agent",
+      "text": "Timers set for garlic and risotto. Recipe doubled. Current step: Saut\u00e9 onions and mushrooms until soft."
+    }
+  ]
+}
