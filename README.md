@@ -42,38 +42,31 @@ the browser and a Gemini Live session. Tools never run in the browser and the AP
 the server. Full component contracts and the ADRs are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ```mermaid
-flowchart TB
-    subgraph browser["Browser client — static/ (vanilla JS) · frontend/ (React HUD)"]
-        mic["mic → AudioWorklet<br/>PCM16 16 kHz"]
-        spk["speaker ← queue<br/>PCM16 24 kHz"]
-        cam["camera → JPEG<br/>every ~1.5 s"]
-    end
+flowchart LR
+    browser["<b>Browser client</b><br/>static/ vanilla JS &middot; frontend/ React HUD<br/>mic &rarr; PCM16 16 kHz<br/>speaker &larr; PCM16 24 kHz<br/>camera &rarr; JPEG ~1.5 s"]
 
     subgraph server["FastAPI session gateway"]
-        main["app/main.py<br/>/ws/voice/{session_id}<br/>app/auth.py — APP_AUTH_TOKEN"]
-        gw["app/live/gateway.py · LiveGateway<br/>uplink + downlink tasks<br/>resumption, GoAway reconnect"]
-        reg["app/tools/registry.py · ToolRegistry<br/>FunctionDeclarations ⇄ async callables<br/>session_id injected server-side"]
-        tools["app/tools/cooking_tools.py<br/>pure async functions"]
+        direction TB
+        gw["<b>LiveGateway</b><br/>app/live/gateway.py<br/>one per connection<br/>uplink + downlink tasks<br/>resumption &middot; GoAway reconnect"]
+        reg["<b>ToolRegistry</b><br/>app/tools/registry.py<br/>session_id injected server-side"]
+        tools["<b>cooking_tools</b><br/>app/tools/cooking_tools.py"]
+        gw -->|"dispatch(session_id, name, args)"| reg
+        reg --> tools
     end
 
-    gemini["Gemini Live API<br/>native audio · server VAD · barge-in<br/>function calling · transcription"]
+    gemini["<b>Gemini Live API</b><br/>native audio &middot; server-side VAD<br/>barge-in &middot; function calling<br/>live transcription"]
 
-    state["StateManager<br/>RecipeState per session<br/>in-memory | Redis"]
-    timers["TimerEngine<br/>asyncio countdowns"]
-    store["RecipeStore (RAG)<br/>DuckDB + vss<br/>gemini-embedding-001"]
+    state["<b>StateManager</b><br/>RecipeState per session<br/>in-memory | Redis"]
+    timers["<b>TimerEngine</b><br/>asyncio countdowns"]
+    store["<b>RecipeStore</b> (RAG)<br/>DuckDB + vss<br/>gemini-embedding-001"]
 
-    browser -- "binary audio · user.text · video.frame" --> main
-    main -- "audio · transcript · timer · state.snapshot" --> browser
-    main --- gw
-    gw -- "send_realtime_input" --> gemini
-    gemini -- "audio · transcripts · tool_call" --> gw
-    gw -- "dispatch(session_id, name, args)" --> reg
-    reg -- "send_tool_response" --> gemini
-    reg --> tools
+    browser <-->|"binary audio<br/>JSON envelopes"| gw
+    gw <-->|"send_realtime_input<br/>audio &middot; transcripts &middot; tool_call"| gemini
+    reg -->|"send_tool_response"| gemini
     tools --> state
     tools --> timers
     tools --> store
-    timers -. "expiry → announce unprompted" .-> gw
+    timers -.->|"expiry &rarr; announce unprompted"| gw
 ```
 
 <details>
