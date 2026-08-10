@@ -113,6 +113,8 @@ class LiveGateway:
         """
         if self._timer_engine is not None:
             self._timer_engine.register_session(self._session_id, self._on_timer_expired)
+            # Timers persisted by an earlier process have records but no tasks.
+            await self._timer_engine.rehydrate(self._session_id)
         consecutive_short_connections = 0
         try:
             while not self._closing:

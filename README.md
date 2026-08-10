@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 89 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 91 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -219,7 +219,7 @@ kitchen-assistant/
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
-├── tests/                         # 89 pytest tests; fake Live backend, no network
+├── tests/                         # 91 pytest tests; fake Live backend, no network
 ├── notebooks/                     # EDA, multimodal practice, tool design, end-to-end demo
 ├── .gemini/skills/                # Authored skill specs behind scaling + timer tools
 ├── ARCHITECTURE.md  workplan.md  frontend_plan.md  CLAUDE.md
@@ -242,7 +242,7 @@ kitchen-assistant/
 
 **6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread, dropping anything past the `RECIPE_MAX_DISTANCE` relevance floor so an off-catalog query returns nothing instead of the nearest row. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts, and a multiplier set before any recipe is loaded survives the load and is applied to it. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
 
-**7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` marks the timer inactive in state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends.
+**7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` drops the timer from state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends, and rebuilt from `start_time + duration_seconds` when a session reconnects, so a timer persisted across a restart still fires.
 
 **8. Surviving the session limit.** Realtime connections are time-capped. On `go_away` (or any Live-side close), the outer loop reconnects with the stored resumption handle while holding the browser WebSocket open. The browser sees only `session.status: reconnecting` → `ready`; conversation context carries over. Reconnects that die inside five seconds — exhausted quota, a bad model id — back off exponentially with jitter and, after six consecutive failures, close the browser socket with an error rather than spin.
 
@@ -345,7 +345,7 @@ poetry run python scripts/eval_tool_calls.py   # tool-call accuracy over 11 labe
 ### Tests and lint
 
 ```bash
-poetry run pytest        # 89 tests; fakes the Live backend — no API key, no network
+poetry run pytest        # 91 tests; fakes the Live backend — no API key, no network
 poetry run ruff check .
 cd frontend && npm run lint && npm run build
 ```

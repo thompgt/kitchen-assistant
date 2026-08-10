@@ -2,11 +2,16 @@
 
 The gateway registers a per-session callback at connection start (no import
 cycle: the engine knows nothing about Live sessions or WebSockets). On expiry
-the engine marks the timer inactive in state and invokes the callback so the
+the engine drops the timer from state and invokes the callback so the
 assistant can announce it unprompted.
+
+Countdown tasks live in this process, so a restart (or a reconnect against a
+Redis-backed StateManager) loses them while the records survive. `rehydrate`
+rebuilds them from `start_time + duration_seconds`.
 """
 import asyncio
 import logging
+from datetime import datetime
 from typing import Awaitable, Callable, Dict, Tuple
 
 from ..schemas import KitchenTimer, RecipeState
@@ -36,7 +41,36 @@ class TimerEngine:
 
     def start(self, session_id: str, timer: KitchenTimer) -> None:
         key = (session_id, timer.id)
-        self._tasks[key] = asyncio.create_task(self._run(session_id, timer))
+        self._tasks[key] = asyncio.create_task(
+            self._run(session_id, timer, timer.duration_seconds)
+        )
+
+    async def rehydrate(self, session_id: str) -> int:
+        """Restart countdowns for timers persisted by an earlier process.
+
+        Without this, a Redis-backed session that survives a restart keeps its
+        timer records forever and none of them ever fire. Timers whose deadline
+        has already passed expire immediately, so the chef is told late rather
+        than never.
+        """
+        state = await self._state_manager.get_state(session_id)
+        if state is None:
+            return 0
+
+        restarted = 0
+        now = datetime.now()
+        for timer in list(state.active_timers.values()):
+            if not timer.is_active or (session_id, timer.id) in self._tasks:
+                continue
+            elapsed = (now - timer.start_time).total_seconds()
+            remaining = max(0.0, timer.duration_seconds - elapsed)
+            self._tasks[(session_id, timer.id)] = asyncio.create_task(
+                self._run(session_id, timer, remaining)
+            )
+            restarted += 1
+        if restarted:
+            logger.info("session %s: rehydrated %d timer(s)", session_id, restarted)
+        return restarted
 
     def cancel(self, session_id: str, timer_id: str) -> bool:
         task = self._tasks.pop((session_id, timer_id), None)
@@ -48,15 +82,14 @@ class TimerEngine:
     def active_count(self, session_id: str) -> int:
         return sum(1 for key in self._tasks if key[0] == session_id)
 
-    async def _run(self, session_id: str, timer: KitchenTimer) -> None:
-        await asyncio.sleep(timer.duration_seconds)
+    async def _run(self, session_id: str, timer: KitchenTimer, delay: float) -> None:
+        await asyncio.sleep(delay)
         self._tasks.pop((session_id, timer.id), None)
 
         def _expire(state: RecipeState) -> None:
-            expired = state.active_timers.get(timer.id)
-            if expired is not None:
-                expired.is_active = False
-                expired.remaining_seconds = 0
+            # Dropped, not just flagged: a kept record grows state forever and
+            # re-ships a dead timer in every subsequent snapshot.
+            state.active_timers.pop(timer.id, None)
 
         await self._state_manager.update(session_id, _expire)
 

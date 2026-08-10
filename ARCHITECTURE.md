@@ -124,7 +124,7 @@ Owns real `asyncio.create_task` countdowns keyed by `(session_id, timer_id)`; su
 1. Sends `{"type":"timer.expired", ...}` JSON to the browser.
 2. Injects a proactive turn into the Live session (`session.send_realtime_input(text=...)` or `send_client_content`) with a nudge like "Timer 'pasta' just finished — announce it", so the assistant *speaks* the expiry unprompted.
 
-The gateway hands the engine a callback pair at session start; the engine never imports the gateway (no cycles). Tasks are cancelled on session disconnect.
+The gateway hands the engine a callback pair at session start; the engine never imports the gateway (no cycles). Tasks are cancelled on session disconnect. Expiry *drops* the record from `active_timers` rather than flagging it, so state does not grow and snapshots stop re-shipping dead timers. Countdown tasks are process-local, so the gateway calls `rehydrate(session_id)` at session start to rebuild them from `start_time + duration_seconds` — without it, timers persisted to Redis would survive a restart as records that never fire.
 
 ### Browser clients
 
