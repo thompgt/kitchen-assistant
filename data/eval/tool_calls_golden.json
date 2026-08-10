@@ -1,0 +1,60 @@
+{
+  "description": "Transcript-driven tool-calling eval for scripts/eval_tool_calls.py. Each case is what the chef says, the tool that must be called, and the argument values that must appear (subset match; extra arguments are allowed). expected_tool: null means the turn should be answered in words with no tool call.",
+  "cases": [
+    {
+      "utterance": "set a timer for eight minutes for the pasta",
+      "expected_tool": "set_kitchen_timer",
+      "expected_args": {"duration_seconds": 480}
+    },
+    {
+      "utterance": "give me twenty five minutes on the roast",
+      "expected_tool": "set_kitchen_timer",
+      "expected_args": {"duration_seconds": 1500}
+    },
+    {
+      "utterance": "what timers do I have going",
+      "expected_tool": "list_timers",
+      "expected_args": {}
+    },
+    {
+      "utterance": "how many millilitres in two cups",
+      "expected_tool": "convert_units",
+      "expected_args": {"value": 2, "from_unit": "cup", "to_unit": "ml"}
+    },
+    {
+      "utterance": "the oven's in celsius, what's four hundred fahrenheit",
+      "expected_tool": "convert_units",
+      "expected_args": {"value": 400, "from_unit": "F", "to_unit": "C"}
+    },
+    {
+      "utterance": "double the recipe, we've got more covers than I thought",
+      "expected_tool": "scale_recipe",
+      "expected_args": {"multiplier": 2.0}
+    },
+    {
+      "utterance": "find me something with mushrooms",
+      "expected_tool": "search_recipes",
+      "expected_args": {}
+    },
+    {
+      "utterance": "next step",
+      "expected_tool": "navigate_steps",
+      "expected_args": {"direction": "next"}
+    },
+    {
+      "utterance": "go back one",
+      "expected_tool": "navigate_steps",
+      "expected_args": {"direction": "previous"}
+    },
+    {
+      "utterance": "jump to step four",
+      "expected_tool": "navigate_steps",
+      "expected_args": {"direction": "jump", "step_index": 3}
+    },
+    {
+      "utterance": "why does the sauce keep splitting",
+      "expected_tool": null,
+      "expected_args": {}
+    }
+  ]
+}

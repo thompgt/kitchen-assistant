@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 87 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 89 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -209,14 +209,17 @@ kitchen-assistant/
 │       └── components/                # StatusBar, InstructionCard, IngredientChecklist,
 │                                      # ActiveTimerBoard, TranscriptPane, CameraPreview, MicButton
 ├── data/
-│   └── recipes_seed.json          # Catalog source of truth (recipes.db is built from it)
+│   ├── recipes_seed.json          # Catalog source of truth (recipes.db is built from it)
+│   └── eval/                      # Labelled retrieval + tool-calling golden sets
 ├── scripts/
 │   ├── ingest_recipes.py          # Seed JSON → DuckDB (idempotent, validating)
 │   ├── setup_vector_search.py     # Embed missing rows (--rebuild: all) + build HNSW index
+│   ├── eval_retrieval.py          # recall@k over the retrieval golden set
+│   ├── eval_tool_calls.py         # tool-call accuracy over the transcript golden set
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
-├── tests/                         # 87 pytest tests; fake Live backend, no network
+├── tests/                         # 89 pytest tests; fake Live backend, no network
 ├── notebooks/                     # EDA, multimodal practice, tool design, end-to-end demo
 ├── .gemini/skills/                # Authored skill specs behind scaling + timer tools
 ├── ARCHITECTURE.md  workplan.md  frontend_plan.md  CLAUDE.md
@@ -328,10 +331,21 @@ poetry run python scripts/live_smoke.py --wav ask_timer_16k.wav --out reply.wav
 
 Sends a request through the exact `LiveConnectConfig` and `ToolRegistry` the gateway uses, prints transcripts and tool calls, and saves the spoken 24 kHz reply to a WAV file. Requires `GOOGLE_API_KEY`.
 
+### Evaluating the LLM half
+
+Unit tests prove the SQL and the dispatch wiring; they say nothing about whether a real chef phrase finds the right dish or whether the model picks the right tool. Two labelled sets in `data/eval/` score that, and both need `GOOGLE_API_KEY`:
+
+```bash
+poetry run python scripts/eval_retrieval.py    # recall@3, MRR, and abstain rate over 19 labelled queries
+poetry run python scripts/eval_tool_calls.py   # tool-call accuracy over 11 labelled chef utterances
+```
+
+`eval_retrieval.py` hits the real `RecipeStore`, so it also measures the relevance floor: cases labelled with no expected id must come back empty. `eval_tool_calls.py` replays each utterance through `generate_content` with the gateway's own `SYSTEM_INSTRUCTION` and `FunctionDeclaration`s, and includes a turn that must *not* call a tool, so over-triggering is a number rather than a vibe. Both exit non-zero below a threshold, so they can gate a release; neither runs in CI, because CI has no key. What CI does check is that the labels still match the code — `tests/test_eval_golden.py` asserts every expected recipe id, tool name and argument still exists.
+
 ### Tests and lint
 
 ```bash
-poetry run pytest        # 80 tests; fakes the Live backend — no API key, no network
+poetry run pytest        # 89 tests; fakes the Live backend — no API key, no network
 poetry run ruff check .
 cd frontend && npm run lint && npm run build
 ```
