@@ -5,10 +5,12 @@
 const sessionId = crypto.randomUUID().slice(0, 8);
 // If the page was loaded with ?token=..., forward it to the WS route — lets a
 // deployer gate access with APP_AUTH_TOKEN by sharing "https://host/?token=...".
+// It travels as a subprotocol, not a query param: WS URLs end up in proxy logs.
 const authToken = new URLSearchParams(location.search).get("token");
 const wsUrl =
-  `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/voice/${sessionId}` +
-  (authToken ? `?token=${encodeURIComponent(authToken)}` : "");
+  `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/voice/${sessionId}`;
+const wsProtocols = ["kitchen-assistant.v1"];
+if (authToken) wsProtocols.push(`kitchen-assistant.token.${authToken}`);
 
 const statusDot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
@@ -91,7 +93,7 @@ function handleEnvelope(envelope) {
 }
 
 function connect() {
-  ws = new WebSocket(wsUrl);
+  ws = new WebSocket(wsUrl, wsProtocols);
   ws.binaryType = "arraybuffer";
   ws.onopen = () => { micBtn.disabled = false; camBtn.disabled = false; };
   ws.onmessage = (event) => {

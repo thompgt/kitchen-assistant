@@ -224,8 +224,21 @@ async def test_search_recipes_returns_ranked_results(sample_recipe: RecipeMetada
     result = await search_recipes(store, "pasta", k=3)
     assert result["status"] == "success"
     assert result["results"] == [
-        {"id": "pasta-01", "title": "Weeknight Pasta", "total_time_minutes": 20}
+        {
+            "id": "pasta-01",
+            "title": "Weeknight Pasta",
+            "total_time_minutes": 20,
+            "distance": 0.0,
+        }
     ]
+    assert "note" not in result
+
+
+async def test_search_recipes_with_no_hits_tells_the_model_to_say_so() -> None:
+    result = await search_recipes(FakeRecipeStore({}), "sushi", k=3)
+    assert result["status"] == "success"
+    assert result["results"] == []
+    assert "no match" in result["note"]
 
 
 async def test_load_recipe_hydrates_state(
@@ -253,7 +266,7 @@ async def test_load_recipe_unknown_id_returns_error(state_manager: StateManager)
     assert await state_manager.get_state("s1") is None  # nothing persisted
 
 
-async def test_load_recipe_resets_step_index_and_multiplier(
+async def test_load_recipe_resets_step_index_but_keeps_multiplier(
     state_manager: StateManager, sample_recipe: RecipeMetadata
 ) -> None:
     await scale_recipe(state_manager, "s1", 3.0)
@@ -269,7 +282,23 @@ async def test_load_recipe_resets_step_index_and_multiplier(
     state = await state_manager.get_state("s1")
     assert state is not None
     assert state.current_step_index == 0
-    assert state.servings_multiplier == 1.0
+    assert state.servings_multiplier == 3.0
+
+
+async def test_load_recipe_applies_a_multiplier_set_before_the_recipe_existed(
+    state_manager: StateManager, sample_recipe: RecipeMetadata
+) -> None:
+    scaled = await scale_recipe(state_manager, "s1", 2.0)
+    assert "scaled_ingredients" not in scaled  # nothing to scale yet, only a promise
+
+    store = FakeRecipeStore({sample_recipe.id: sample_recipe})
+    result = await load_recipe(state_manager, "s1", store, "pasta-01")
+
+    assert result["servings_multiplier"] == 2.0
+    assert result["scaled_ingredients"] == [
+        {"name": "spaghetti", "amount": 400.0, "unit": "g"},
+        {"name": "olive oil", "amount": 4.0, "unit": "tbsp"},
+    ]
 
 
 # --- navigate_steps ----------------------------------------------------------

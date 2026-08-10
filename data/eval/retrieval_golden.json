@@ -1,0 +1,24 @@
+{
+  "description": "Golden retrieval set for scripts/eval_retrieval.py. Each case is a phrase a chef might say, plus every catalog id that is a defensible answer. An empty expected_ids means the catalog has nothing like it: the relevance floor must return zero rows.",
+  "cases": [
+    {"query": "italian pasta with eggs and cured pork", "expected_ids": ["r1"]},
+    {"query": "something with mushrooms", "expected_ids": ["r2"]},
+    {"query": "spicy coconut curry", "expected_ids": ["r3", "r6"]},
+    {"query": "mexican ground beef for the family", "expected_ids": ["r4", "r10"]},
+    {"query": "dough with tomato and fresh mozzarella", "expected_ids": ["r5", "r12"]},
+    {"query": "indian chicken in a creamy sauce", "expected_ids": ["r6"]},
+    {"query": "slow braised beef in red wine", "expected_ids": ["r7"]},
+    {"query": "thai noodles, no meat", "expected_ids": ["r8"]},
+    {"query": "whole roast chicken with citrus", "expected_ids": ["r9"]},
+    {"query": "vegetarian stew with beans", "expected_ids": ["r10"]},
+    {"query": "fish in the oven with a sweet glaze", "expected_ids": ["r11"]},
+    {"query": "layered baked pasta for a crowd", "expected_ids": ["r12"]},
+    {"query": "eggs poached in a spiced tomato sauce", "expected_ids": ["r13"]},
+    {"query": "korean rice bowl with vegetables", "expected_ids": ["r14"]},
+    {"query": "creamy soup to go with a sandwich", "expected_ids": ["r15"]},
+    {"query": "quick garlic prawns in butter", "expected_ids": ["r16"]},
+    {"query": "how do I temper chocolate for bonbons", "expected_ids": []},
+    {"query": "sushi rice and raw tuna", "expected_ids": []},
+    {"query": "sourdough starter feeding schedule", "expected_ids": []}
+  ]
+}

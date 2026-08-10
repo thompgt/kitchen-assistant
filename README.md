@@ -63,15 +63,15 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 80 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
-- GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
+- 96 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- GitHub Actions CI running `poetry check --lock`, `ruff` and `pytest` across a 3.11/3.13 matrix, plus `oxlint` and a real frontend type-check + build.
 
 **Frontend**
 - React 19 + TypeScript (strict) + Vite + Tailwind + Zustand HUD, designed for glanceability across a room.
 - A second, **build-free vanilla JS client** speaking the byte-identical WebSocket protocol — proof the server contract is genuinely client-agnostic.
 
 **Packaging & ops**
-- Poetry-managed Python 3.11+, multi-stage Dockerfile (Node stage builds the HUD, Python stage runs it), Docker Compose with an opt-in Redis profile, non-root container user and a `HEALTHCHECK`.
+- Poetry-managed Python 3.11–3.13 (both ends tested in CI), multi-stage Dockerfile (Node stage builds the HUD, Python stage runs it), Docker Compose with an opt-in Redis profile, non-root container user and a `HEALTHCHECK`.
 - Shared-token WebSocket auth using `hmac.compare_digest`, with a documented rationale for why full user accounts would be the wrong solution here.
 
 ---
@@ -131,7 +131,7 @@ Regenerate with `python scripts/render_architecture.py`.
 | `session_resumption` | rolling handle | Survives the connection time limit (ADR-005) |
 | `context_window_compression` | sliding window | Long cooking sessions stay in budget |
 
-**Embedding model — `gemini-embedding-001`, 3072 dimensions.** `RETRIEVAL_DOCUMENT` task type when embedding the catalog (batched, 20 per call, only for rows missing a vector); `RETRIEVAL_QUERY` when embedding a chef's search phrase.
+**Embedding model — `gemini-embedding-001`, 3072 dimensions.** `RETRIEVAL_DOCUMENT` task type when embedding the catalog (batched, 20 per call, only for rows missing a vector — `--rebuild` re-embeds everything); `RETRIEVAL_QUERY` when embedding a chef's search phrase. Each recipe is embedded as its title, its ingredient *names*, and its step instructions, so technique words are searchable.
 
 **Tool schemas — 8 `types.FunctionDeclaration`s** (`app/tools/registry.py`). Declarations expose only user-meaningful parameters; server context is injected at dispatch:
 
@@ -209,15 +209,17 @@ kitchen-assistant/
 │       └── components/                # StatusBar, InstructionCard, IngredientChecklist,
 │                                      # ActiveTimerBoard, TranscriptPane, CameraPreview, MicButton
 ├── data/
-│   ├── recipes.db                 # DuckDB catalog (16 recipes, embedded)
-│   └── recipes_seed.json          # Catalog source of truth
+│   ├── recipes_seed.json          # Catalog source of truth (recipes.db is built from it)
+│   └── eval/                      # Labelled retrieval + tool-calling golden sets
 ├── scripts/
 │   ├── ingest_recipes.py          # Seed JSON → DuckDB (idempotent, validating)
-│   ├── setup_vector_search.py     # Embed missing rows + build HNSW index
+│   ├── setup_vector_search.py     # Embed missing rows (--rebuild: all) + build HNSW index
+│   ├── eval_retrieval.py          # recall@k over the retrieval golden set
+│   ├── eval_tool_calls.py         # tool-call accuracy over the transcript golden set
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
-├── tests/                         # 80 pytest tests; fake Live backend, no network
+├── tests/                         # 96 pytest tests; fake Live backend, no network
 ├── notebooks/                     # EDA, multimodal practice, tool design, end-to-end demo
 ├── .gemini/skills/                # Authored skill specs behind scaling + timer tools
 ├── ARCHITECTURE.md  workplan.md  frontend_plan.md  CLAUDE.md
@@ -228,7 +230,7 @@ kitchen-assistant/
 
 ## How it works
 
-**1. Connect.** The browser opens `ws://host/ws/voice/{session_id}?token=…`. `app/main.py` accepts, checks the token against `APP_AUTH_TOKEN` (`hmac.compare_digest`; open access when unset) and closes with code `4001` if it fails. On success it constructs one `LiveGateway` for that connection — no conversation state is shared between clients.
+**1. Connect.** The browser opens `ws://host/ws/voice/{session_id}`, offering the subprotocols `kitchen-assistant.v1` and, when a token is in play, `kitchen-assistant.token.<value>`. `app/main.py` accepts with `kitchen-assistant.v1`, checks the token against `APP_AUTH_TOKEN` (`hmac.compare_digest`; open access when unset) and closes with code `4001` if it fails. The token never enters the URL, where proxies and access logs would capture it. On success it constructs one `LiveGateway` for that connection — no conversation state is shared between clients.
 
 **2. Open the model session.** The gateway calls its connect factory (`client.aio.live.connect`, or an injected fake in tests), registers a timer-expiry callback for the session, and sends `{"type":"session.status","status":"ready"}`. Two tasks then run concurrently until either finishes.
 
@@ -238,11 +240,11 @@ kitchen-assistant/
 
 **5. Tool calls.** When the model emits a `tool_call`, the gateway hands each function call to `ToolRegistry.dispatch(session_id, name, args)`. The registry inspects the target function's signature and injects whichever of `state_manager`, `session_id`, `timer_engine`, `recipe_store` it declares — none of which the model can see or forge. Results go back as `types.FunctionResponse`, and the gateway follows up with a `state.snapshot` so the UI updates in lockstep with what the assistant is about to say.
 
-**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
+**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread, dropping anything past the `RECIPE_MAX_DISTANCE` relevance floor so an off-catalog query returns nothing instead of the nearest row. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts, and a multiplier set before any recipe is loaded survives the load and is applied to it. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
 
-**7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` marks the timer inactive in state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends.
+**7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` drops the timer from state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. The label in that turn is chef speech round-tripped through the model, so it is sanitized (no brackets, no newlines, length-capped) and quoted as explicitly untrusted data rather than pasted into the framing. Countdowns are cancelled when the session ends, and rebuilt from `start_time + duration_seconds` when a session reconnects, so a timer persisted across a restart still fires.
 
-**8. Surviving the session limit.** Realtime connections are time-capped. On `go_away` (or any Live-side close), the outer loop reconnects with the stored resumption handle while holding the browser WebSocket open. The browser sees only `session.status: reconnecting` → `ready`; conversation context carries over.
+**8. Surviving the session limit.** Realtime connections are time-capped. On `go_away` (or any Live-side close), the outer loop reconnects with the stored resumption handle while holding the browser WebSocket open. The browser sees only `session.status: reconnecting` → `ready`; conversation context carries over. Reconnects that die inside five seconds — exhausted quota, a bad model id — back off exponentially with jitter and, after six consecutive failures, close the browser socket with an error rather than spin.
 
 **9. State throughout.** Every mutation goes through `StateManager.update(session_id, mutator)`, which serializes read-modify-write behind a per-session `asyncio.Lock`. In-memory by default; Redis when `USE_REDIS=true`.
 
@@ -251,7 +253,9 @@ kitchen-assistant/
 ## How to run
 
 ### Prerequisites
-- **Python 3.11+** and [Poetry](https://python-poetry.org/)
+- **Python 3.11–3.13** and [Poetry](https://python-poetry.org/) — notebooks must be
+  executed under the project's Poetry env so committed outputs match a runtime the
+  lockfile actually describes
 - A **Google AI (Gemini) API key** with Live API access ([aistudio.google.com/apikey](https://aistudio.google.com/apikey))
 - **Node.js 22+** — only needed to build the React HUD (CI and the Dockerfile use Node 22)
 - Optional: Docker, for the containerized path
@@ -264,6 +268,11 @@ cd kitchen-assistant
 
 poetry install
 cp .env.example .env          # then fill in GOOGLE_API_KEY — see the table below
+
+# Build the recipe catalog (derived, not committed — see Recipe catalog below)
+poetry run python scripts/ingest_recipes.py
+poetry run python scripts/setup_vector_search.py
+
 poetry run uvicorn app.main:app --reload
 ```
 
@@ -296,19 +305,22 @@ Copy `.env.example` to `.env` and fill it in. **Never commit `.env`.**
 | `GOOGLE_API_KEY` | Gemini API access — required for voice *and* for semantic search | required |
 | `LIVE_MODEL` | Live-capable model id (preview names churn) | `gemini-3.1-flash-live-preview` |
 | `RECIPES_DB_PATH` | DuckDB recipe database | `data/recipes.db` |
+| `RECIPE_MAX_DISTANCE` | Relevance floor for semantic search (Euclidean, 0–2) | `1.0` |
 | `APP_AUTH_TOKEN` | Shared token gating `/ws/voice/{session_id}` | unset (open access) |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins | app origin + Vite dev server |
 | `USE_REDIS` | Use Redis for session state instead of memory | `false` |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
 
-**Auth.** Open by default, which is fine on a trusted LAN. To gate it, set `APP_AUTH_TOKEN` and share the URL with the token attached — `https://host/?token=<value>` — which both clients forward to the WebSocket. This is one shared secret, not a user-account system: it is a single-deployment kitchen appliance, and concurrent users already get isolated state via `session_id` (ADR-009).
+**Auth.** Open by default, which is fine on a trusted LAN. To gate it, set `APP_AUTH_TOKEN` and share the *page* URL with the token attached — `https://host/?token=<value>` — which both clients read and forward to the WebSocket as a `kitchen-assistant.token.<value>` subprotocol rather than a query parameter. This is one shared secret, not a user-account system: it is a single-deployment kitchen appliance, and concurrent users already get isolated state via `session_id` (ADR-009).
 
 ### Recipe catalog
 
-The catalog ships pre-built in `data/recipes.db` (16 recipes, already embedded). To rebuild it or add recipes, edit `data/recipes_seed.json` and run:
+`data/recipes.db` is a derived artifact and is not committed — `data/recipes_seed.json` is the source of truth. Build it once after cloning, and again whenever you edit the seed:
 
 ```bash
 poetry run python scripts/ingest_recipes.py       # validate + load the JSON catalog into DuckDB (idempotent)
 poetry run python scripts/setup_vector_search.py  # embed any rows missing a vector, build the HNSW index
+#                                        add --rebuild to re-embed every row (needed if the document text changes)
 ```
 
 `setup_vector_search.py` requires `GOOGLE_API_KEY`; `ingest_recipes.py` does not.
@@ -322,10 +334,22 @@ poetry run python scripts/live_smoke.py --wav ask_timer_16k.wav --out reply.wav
 
 Sends a request through the exact `LiveConnectConfig` and `ToolRegistry` the gateway uses, prints transcripts and tool calls, and saves the spoken 24 kHz reply to a WAV file. Requires `GOOGLE_API_KEY`.
 
+### Evaluating the LLM half
+
+Unit tests prove the SQL and the dispatch wiring; they say nothing about whether a real chef phrase finds the right dish or whether the model picks the right tool. Two labelled sets in `data/eval/` score that, and both need `GOOGLE_API_KEY`:
+
+```bash
+poetry run python scripts/eval_retrieval.py    # recall@3, MRR, and abstain rate over 19 labelled queries
+poetry run python scripts/eval_tool_calls.py   # tool-call accuracy over 11 labelled chef utterances
+```
+
+`eval_retrieval.py` hits the real `RecipeStore`, so it also measures the relevance floor: cases labelled with no expected id must come back empty. `eval_tool_calls.py` replays each utterance through `generate_content` with the gateway's own `SYSTEM_INSTRUCTION` and `FunctionDeclaration`s, and includes a turn that must *not* call a tool, so over-triggering is a number rather than a vibe. Both exit non-zero below a threshold, so they can gate a release; neither runs in CI, because CI has no key. What CI does check is that the labels still match the code — `tests/test_eval_golden.py` asserts every expected recipe id, tool name and argument still exists.
+
 ### Tests and lint
 
 ```bash
-poetry run pytest        # 80 tests; fakes the Live backend — no API key, no network
+poetry run pytest        # 101 tests; fakes the Live backend — no API key, no network
+poetry check --lock      # lockfile still matches pyproject
 poetry run ruff check .
 cd frontend && npm run lint && npm run build
 ```
