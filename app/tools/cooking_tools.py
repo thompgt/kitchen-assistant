@@ -243,16 +243,30 @@ async def search_recipes(recipe_store: RecipeStore, query: str, k: int = 3) -> D
         k: Maximum number of results to return.
 
     Returns:
-        A dictionary with the top matching recipes (id, title, total_time_minutes).
+        A dictionary with the top matching recipes (id, title, total_time_minutes,
+        distance — lower is a closer match). Results below the relevance floor are
+        dropped, so an empty list means the catalog has nothing like the query and
+        you should say so rather than offering the nearest row.
     """
     results = await recipe_store.search(query, k=k)
-    return {
+    response: Dict[str, Any] = {
         "status": "success",
         "results": [
-            {"id": r.id, "title": r.title, "total_time_minutes": r.total_time_minutes}
+            {
+                "id": r.id,
+                "title": r.title,
+                "total_time_minutes": r.total_time_minutes,
+                "distance": round(r.distance, 3),
+            }
             for r in results
         ],
     }
+    if not results:
+        response["note"] = (
+            f"No recipe in the catalog matches '{query}'. Tell the chef there is no "
+            "match instead of suggesting an unrelated recipe."
+        )
+    return response
 
 
 async def load_recipe(

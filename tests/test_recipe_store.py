@@ -60,7 +60,8 @@ def fixture_db(tmp_path) -> str:
 
 
 async def test_search_returns_closest_match_first(fixture_db: str) -> None:
-    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(1)))
+    # One-hot fixtures sit sqrt(2) apart, so the floor is lifted to see the ranking.
+    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(1)), max_distance=2.0)
     results = await store.search("something with mushrooms", k=2)
 
     assert len(results) == 2
@@ -70,10 +71,28 @@ async def test_search_returns_closest_match_first(fixture_db: str) -> None:
 
 
 async def test_search_respects_k(fixture_db: str) -> None:
-    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(0)))
+    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(0)), max_distance=2.0)
     results = await store.search("pasta", k=1)
     assert len(results) == 1
     assert results[0].id == "r1"
+
+
+async def test_search_drops_hits_beyond_the_relevance_floor(fixture_db: str) -> None:
+    """An off-catalog query must return nothing, not the nearest of 3 recipes."""
+    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(0)))
+    exact = await store.search("carbonara", k=3)
+    assert [r.id for r in exact] == ["r1"]  # the other two are sqrt(2) away
+
+    off_catalog = RecipeStore(
+        db_path=fixture_db, client=FakeClient(_one_hot(EMBEDDING_DIM - 1))
+    )
+    assert await off_catalog.search("sushi", k=3) == []
+
+
+async def test_max_distance_reads_the_env_override(fixture_db: str, monkeypatch) -> None:
+    monkeypatch.setenv("RECIPE_MAX_DISTANCE", "2.0")
+    store = RecipeStore(db_path=fixture_db, client=FakeClient(_one_hot(0)))
+    assert len(await store.search("pasta", k=3)) == 3
 
 
 async def test_get_recipe_hydrates_metadata(fixture_db: str) -> None:

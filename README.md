@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 84 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 87 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -238,7 +238,7 @@ kitchen-assistant/
 
 **5. Tool calls.** When the model emits a `tool_call`, the gateway hands each function call to `ToolRegistry.dispatch(session_id, name, args)`. The registry inspects the target function's signature and injects whichever of `state_manager`, `session_id`, `timer_engine`, `recipe_store` it declares — none of which the model can see or forge. Results go back as `types.FunctionResponse`, and the gateway follows up with a `state.snapshot` so the UI updates in lockstep with what the assistant is about to say.
 
-**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts, and a multiplier set before any recipe is loaded survives the load and is applied to it. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
+**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread, dropping anything past the `RECIPE_MAX_DISTANCE` relevance floor so an off-catalog query returns nothing instead of the nearest row. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts, and a multiplier set before any recipe is loaded survives the load and is applied to it. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
 
 **7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` marks the timer inactive in state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends.
 
@@ -296,6 +296,7 @@ Copy `.env.example` to `.env` and fill it in. **Never commit `.env`.**
 | `GOOGLE_API_KEY` | Gemini API access — required for voice *and* for semantic search | required |
 | `LIVE_MODEL` | Live-capable model id (preview names churn) | `gemini-3.1-flash-live-preview` |
 | `RECIPES_DB_PATH` | DuckDB recipe database | `data/recipes.db` |
+| `RECIPE_MAX_DISTANCE` | Relevance floor for semantic search (Euclidean, 0–2) | `1.0` |
 | `APP_AUTH_TOKEN` | Shared token gating `/ws/voice/{session_id}` | unset (open access) |
 | `USE_REDIS` | Use Redis for session state instead of memory | `false` |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379` |

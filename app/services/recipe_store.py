@@ -20,13 +20,29 @@ from ..schemas import Ingredient, RecipeMetadata, RecipeSearchResult, RecipeStep
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIM = 3072
 
+# Relevance floor. `array_distance` is Euclidean over normalized embeddings, so
+# distance runs 0 (identical) to 2 (opposite); ~1.0 is the point where a hit
+# stops being about the same dish. Without a floor a 16-recipe catalog always
+# returns its k nearest rows, so "sushi" confidently comes back as pasta.
+DEFAULT_MAX_DISTANCE = 1.0
+
 
 class RecipeStore:
     """Read-only access to the recipe catalog: semantic search + hydration."""
 
-    def __init__(self, db_path: Optional[str] = None, client: Optional[Any] = None):
+    def __init__(
+        self,
+        db_path: Optional[str] = None,
+        client: Optional[Any] = None,
+        max_distance: Optional[float] = None,
+    ):
         self._db_path = db_path or os.getenv("RECIPES_DB_PATH", "data/recipes.db")
         self._client = client  # lazily built via _get_client so import never needs an API key
+        self._max_distance = (
+            max_distance
+            if max_distance is not None
+            else float(os.getenv("RECIPE_MAX_DISTANCE", DEFAULT_MAX_DISTANCE))
+        )
 
     def _get_client(self) -> Any:
         if self._client is None:
@@ -55,10 +71,11 @@ class RecipeStore:
                     SELECT id, title, total_time_minutes,
                            array_distance(embedding, ?::FLOAT[{EMBEDDING_DIM}]) AS distance
                     FROM recipes
+                    WHERE array_distance(embedding, ?::FLOAT[{EMBEDDING_DIM}]) <= ?
                     ORDER BY distance ASC
                     LIMIT ?
                     """,
-                    [vector, k],
+                    [vector, vector, self._max_distance, k],
                 ).fetchall()
             finally:
                 con.close()

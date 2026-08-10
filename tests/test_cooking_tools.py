@@ -224,8 +224,21 @@ async def test_search_recipes_returns_ranked_results(sample_recipe: RecipeMetada
     result = await search_recipes(store, "pasta", k=3)
     assert result["status"] == "success"
     assert result["results"] == [
-        {"id": "pasta-01", "title": "Weeknight Pasta", "total_time_minutes": 20}
+        {
+            "id": "pasta-01",
+            "title": "Weeknight Pasta",
+            "total_time_minutes": 20,
+            "distance": 0.0,
+        }
     ]
+    assert "note" not in result
+
+
+async def test_search_recipes_with_no_hits_tells_the_model_to_say_so() -> None:
+    result = await search_recipes(FakeRecipeStore({}), "sushi", k=3)
+    assert result["status"] == "success"
+    assert result["results"] == []
+    assert "no match" in result["note"]
 
 
 async def test_load_recipe_hydrates_state(
