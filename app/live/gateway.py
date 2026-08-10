@@ -150,23 +150,37 @@ class LiveGateway:
 
             text = message.get("text")
             if text is not None:
-                envelope = json.loads(text)
-                envelope_type = envelope.get("type")
-                if envelope_type == "user.text":
-                    await session.send_realtime_input(text=envelope["text"])
-                elif envelope_type == "video.frame":
-                    await session.send_realtime_input(
-                        video=types.Blob(
-                            data=base64.b64decode(envelope["data"]),
-                            mime_type=envelope.get("mime_type", "image/jpeg"),
+                try:
+                    envelope = json.loads(text)
+                    if not isinstance(envelope, dict):
+                        raise ValueError("envelope must be a JSON object")
+                    envelope_type = envelope.get("type")
+                    if envelope_type == "user.text":
+                        await session.send_realtime_input(text=envelope["text"])
+                    elif envelope_type == "video.frame":
+                        await session.send_realtime_input(
+                            video=types.Blob(
+                                data=base64.b64decode(envelope["data"], validate=True),
+                                mime_type=envelope.get("mime_type", "image/jpeg"),
+                            )
                         )
+                    else:
+                        await self._send_json(
+                            {
+                                "type": "error",
+                                "message": f"Unknown client envelope '{envelope_type}'.",
+                            }
+                        )
+                except (ValueError, KeyError, TypeError) as exc:
+                    # binascii.Error and json.JSONDecodeError both subclass ValueError.
+                    # A malformed frame must not abort the cooking session.
+                    logger.warning(
+                        "session %s: discarding malformed client frame: %s",
+                        self._session_id,
+                        exc,
                     )
-                else:
                     await self._send_json(
-                        {
-                            "type": "error",
-                            "message": f"Unknown client envelope '{envelope_type}'.",
-                        }
+                        {"type": "error", "message": f"Malformed client envelope: {exc}"}
                     )
 
     # -- Gemini -> browser ----------------------------------------------------

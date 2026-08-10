@@ -250,6 +250,30 @@ async def test_uplink_unknown_envelope_sends_error(state_manager: StateManager) 
     assert any(e["type"] == "error" and "bogus" in e["message"] for e in envelopes)
 
 
+async def test_uplink_malformed_frames_send_error_and_keep_session_alive(
+    state_manager: StateManager,
+) -> None:
+    ws = QueuedWebSocket(
+        [
+            {"text": "{not json"},  # unparseable
+            {"text": json.dumps(["not", "an", "object"])},  # wrong JSON shape
+            {"text": json.dumps({"type": "user.text"})},  # missing "text"
+            {"text": json.dumps({"type": "video.frame", "data": "!!!not-base64!!!"})},
+            {"text": json.dumps({"type": "user.text", "text": "still here"})},
+        ]
+    )
+    gateway = _make_gateway(state_manager, ws)
+    session = FakeSession()
+
+    await gateway._uplink(session)  # must return normally, not raise
+
+    errors = [
+        json.loads(text) for text in ws.sent_text if json.loads(text)["type"] == "error"
+    ]
+    assert len(errors) == 4
+    assert session.sent_realtime[-1]["text"] == "still here"
+
+
 # --- _downlink protocol coverage ----------------------------------------------
 
 
