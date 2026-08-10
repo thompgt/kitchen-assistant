@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 80 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 83 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -242,7 +242,7 @@ kitchen-assistant/
 
 **7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` marks the timer inactive in state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends.
 
-**8. Surviving the session limit.** Realtime connections are time-capped. On `go_away` (or any Live-side close), the outer loop reconnects with the stored resumption handle while holding the browser WebSocket open. The browser sees only `session.status: reconnecting` → `ready`; conversation context carries over.
+**8. Surviving the session limit.** Realtime connections are time-capped. On `go_away` (or any Live-side close), the outer loop reconnects with the stored resumption handle while holding the browser WebSocket open. The browser sees only `session.status: reconnecting` → `ready`; conversation context carries over. Reconnects that die inside five seconds — exhausted quota, a bad model id — back off exponentially with jitter and, after six consecutive failures, close the browser socket with an error rather than spin.
 
 **9. State throughout.** Every mutation goes through `StateManager.update(session_id, mutator)`, which serializes read-modify-write behind a per-session `asyncio.Lock`. In-memory by default; Redis when `USE_REDIS=true`.
 

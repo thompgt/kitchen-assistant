@@ -12,6 +12,7 @@ import base64
 import json
 import logging
 import os
+import random
 from typing import Any, AsyncContextManager, Callable, Dict, Optional
 
 from fastapi import WebSocket
@@ -27,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_LIVE_MODEL = "gemini-3.1-flash-live-preview"
 INPUT_AUDIO_MIME = "audio/pcm;rate=16000"
+
+# Reconnect policy. A connection shorter than HEALTHY_CONNECTION_SECONDS never
+# really got going (quota exhausted, bad model id: accept-then-close), so those
+# back off exponentially with jitter instead of spinning. Anything longer is a
+# normal GoAway rotation and resets the counter.
+HEALTHY_CONNECTION_SECONDS = 5.0
+RECONNECT_BASE_DELAY_SECONDS = 0.5
+RECONNECT_MAX_DELAY_SECONDS = 30.0
+MAX_CONSECUTIVE_RECONNECTS = 6
+RECONNECT_FAILED_CLOSE_CODE = 1011
 
 SYSTEM_INSTRUCTION = (
     "You are an Executive Sous-Chef voice assistant for a busy kitchen. "
@@ -102,8 +113,10 @@ class LiveGateway:
         """
         if self._timer_engine is not None:
             self._timer_engine.register_session(self._session_id, self._on_timer_expired)
+        consecutive_short_connections = 0
         try:
             while not self._closing:
+                connected_at = asyncio.get_running_loop().time()
                 async with self._connect_factory() as session:
                     self._session = session
                     await self._send_json({"type": "session.status", "status": "ready"})
@@ -118,19 +131,61 @@ class LiveGateway:
                     for task in done:
                         task.result()  # surface uplink/downlink errors
                 self._session = None
+                if self._closing:
+                    continue
 
-                if not self._closing:
-                    logger.info(
-                        "session %s: Live connection ended, reconnecting (handle=%s)",
+                elapsed = asyncio.get_running_loop().time() - connected_at
+                if elapsed >= HEALTHY_CONNECTION_SECONDS:
+                    consecutive_short_connections = 0
+                else:
+                    consecutive_short_connections += 1
+
+                if consecutive_short_connections > MAX_CONSECUTIVE_RECONNECTS:
+                    logger.error(
+                        "session %s: %d consecutive short-lived Live connections, giving up",
                         self._session_id,
-                        "yes" if self._resumption_handle else "no",
+                        consecutive_short_connections,
                     )
                     await self._send_json(
-                        {"type": "session.status", "status": "reconnecting"}
+                        {
+                            "type": "error",
+                            "message": "Lost the Gemini Live connection and could not "
+                            "re-establish it. Reload to try again.",
+                        }
                     )
+                    await self._ws.close(
+                        code=RECONNECT_FAILED_CLOSE_CODE,
+                        reason="Live reconnect attempts exhausted",
+                    )
+                    self._closing = True
+                    continue
+
+                delay = self._reconnect_delay(consecutive_short_connections)
+                logger.info(
+                    "session %s: Live connection ended after %.1fs, reconnecting in %.2fs "
+                    "(handle=%s)",
+                    self._session_id,
+                    elapsed,
+                    delay,
+                    "yes" if self._resumption_handle else "no",
+                )
+                await self._send_json({"type": "session.status", "status": "reconnecting"})
+                if delay:
+                    await asyncio.sleep(delay)
         finally:
             if self._timer_engine is not None:
                 self._timer_engine.unregister_session(self._session_id)
+
+    @staticmethod
+    def _reconnect_delay(consecutive_short_connections: int) -> float:
+        """Full-jitter exponential backoff; 0 after a healthy connection."""
+        if consecutive_short_connections <= 0:
+            return 0.0
+        ceiling = min(
+            RECONNECT_BASE_DELAY_SECONDS * 2 ** (consecutive_short_connections - 1),
+            RECONNECT_MAX_DELAY_SECONDS,
+        )
+        return random.uniform(0.0, ceiling)
 
     # -- browser -> Gemini ----------------------------------------------------
 

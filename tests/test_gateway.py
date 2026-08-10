@@ -13,6 +13,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
+import app.live.gateway as gateway_module
 from app.live.gateway import LiveGateway
 from app.schemas import KitchenTimer
 from app.state_manager import StateManager
@@ -23,12 +24,16 @@ class FakeWebSocket:
     def __init__(self) -> None:
         self.sent_text: List[str] = []
         self.sent_bytes: List[bytes] = []
+        self.closed: Optional[Dict[str, Any]] = None
 
     async def send_text(self, text: str) -> None:
         self.sent_text.append(text)
 
     async def send_bytes(self, data: bytes) -> None:
         self.sent_bytes.append(data)
+
+    async def close(self, code: int = 1000, reason: Optional[str] = None) -> None:
+        self.closed = {"code": code, "reason": reason}
 
 
 class FakeSession:
@@ -400,3 +405,48 @@ async def test_run_reconnects_after_go_away_then_stops_on_disconnect(
         if json.loads(text).get("type") == "session.status"
     ]
     assert statuses == ["ready", "reconnecting", "ready"]
+
+
+class EndlessConnectFactory:
+    """Every connect yields a session that closes immediately (quota exhausted)."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def __call__(self) -> _ConnectCM:
+        self.call_count += 1
+        return _ConnectCM(FakeLiveSession())
+
+
+async def test_run_backs_off_and_bails_out_of_a_hopeless_reconnect_loop(
+    state_manager: StateManager, monkeypatch: Any
+) -> None:
+    monkeypatch.setattr(gateway_module.random, "uniform", lambda _a, _b: 0.0)
+    registry = ToolRegistry(state_manager)
+    connect_factory = EndlessConnectFactory()
+    ws = ScriptedWebSocket(disconnect_after=10_000)  # browser never goes away
+
+    gateway = LiveGateway(
+        websocket=ws,
+        session_id="s1",
+        state_manager=state_manager,
+        registry=registry,
+        connect_factory=connect_factory,
+    )
+
+    await asyncio.wait_for(gateway.run(), timeout=5)
+
+    assert connect_factory.call_count == gateway_module.MAX_CONSECUTIVE_RECONNECTS + 1
+    envelopes = [json.loads(text) for text in ws.sent_text]
+    assert any(e["type"] == "error" for e in envelopes)
+    assert ws.closed is not None
+    assert ws.closed["code"] == gateway_module.RECONNECT_FAILED_CLOSE_CODE
+
+
+def test_reconnect_delay_grows_and_is_capped() -> None:
+    assert LiveGateway._reconnect_delay(0) == 0.0
+    ceilings = [
+        max(LiveGateway._reconnect_delay(n) for _ in range(200)) for n in (1, 2, 3)
+    ]
+    assert ceilings[0] < ceilings[1] < ceilings[2]  # jittered, but growing
+    assert LiveGateway._reconnect_delay(50) <= gateway_module.RECONNECT_MAX_DELAY_SECONDS
