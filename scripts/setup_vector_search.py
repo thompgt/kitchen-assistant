@@ -2,9 +2,13 @@
 
 Only recipes missing an embedding are sent to the API, batched into a
 single embed_content call per chunk instead of one request per recipe.
+Pass `--rebuild` to clear existing vectors first, which is what an
+embedding-document change requires.
 """
+import argparse
+import json
 import os
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import duckdb
 from dotenv import load_dotenv
@@ -35,7 +39,22 @@ def _chunks(items: List, size: int) -> List[List]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def setup_vector_db(db_path: str = DB_PATH) -> int:
+def build_document(title: str, ingredients_json: str, steps_json: str) -> str:
+    """The text a recipe is embedded as.
+
+    Ingredient and step columns are DuckDB structs; stringified they carry
+    `{"name":...}` keys that add nothing to the vector. Only the human-readable
+    values go in, and the step instructions go in too — technique ("sear",
+    "fold", "proof") is most of what a chef actually searches by.
+    """
+    ingredients: List[Any] = json.loads(ingredients_json)
+    steps: List[Any] = json.loads(steps_json)
+    names = ", ".join(str(item["name"]) for item in ingredients)
+    instructions = " ".join(str(item["instruction"]) for item in steps)
+    return f"{title}. Ingredients: {names}. Steps: {instructions}"
+
+
+def setup_vector_db(db_path: str = DB_PATH, rebuild: bool = False) -> int:
     con = duckdb.connect(db_path)
 
     print("Installing DuckDB VSS extension...")
@@ -46,8 +65,14 @@ def setup_vector_db(db_path: str = DB_PATH) -> int:
     print("Ensuring embedding column exists...")
     con.execute("ALTER TABLE recipes ADD COLUMN IF NOT EXISTS embedding FLOAT[3072];")
 
-    pending: List[Tuple[str, str]] = con.execute(
-        "SELECT id, title, ingredients::VARCHAR FROM recipes WHERE embedding IS NULL"
+    if rebuild:
+        print("Clearing existing embeddings (--rebuild)...")
+        con.execute("DROP INDEX IF EXISTS recipe_vss_idx;")
+        con.execute("UPDATE recipes SET embedding = NULL;")
+
+    pending: List[Tuple[str, str, str, str]] = con.execute(
+        "SELECT id, title, ingredients::VARCHAR, steps::VARCHAR "
+        "FROM recipes WHERE embedding IS NULL"
     ).fetchall()
 
     if not pending:
@@ -55,9 +80,12 @@ def setup_vector_db(db_path: str = DB_PATH) -> int:
     else:
         print(f"Embedding {len(pending)} recipe(s) missing vectors, in batches of {BATCH_SIZE}...")
         for batch in _chunks(pending, BATCH_SIZE):
-            texts = [f"{title}. Ingredients: {ingredients}" for _, title, ingredients in batch]
+            texts = [
+                build_document(title, ingredients, steps)
+                for _, title, ingredients, steps in batch
+            ]
             vectors = get_embeddings(texts)
-            for (recipe_id, title, _), vector in zip(batch, vectors):
+            for (recipe_id, title, _, _), vector in zip(batch, vectors):
                 con.execute("UPDATE recipes SET embedding = ? WHERE id = ?", [vector, recipe_id])
                 print(f"  embedded: {title}")
 
@@ -70,4 +98,11 @@ def setup_vector_db(db_path: str = DB_PATH) -> int:
 
 
 if __name__ == "__main__":
-    setup_vector_db()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Re-embed every recipe instead of only those missing a vector.",
+    )
+    args = parser.parse_args()
+    setup_vector_db(rebuild=args.rebuild)

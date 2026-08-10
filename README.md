@@ -131,7 +131,7 @@ Regenerate with `python scripts/render_architecture.py`.
 | `session_resumption` | rolling handle | Survives the connection time limit (ADR-005) |
 | `context_window_compression` | sliding window | Long cooking sessions stay in budget |
 
-**Embedding model — `gemini-embedding-001`, 3072 dimensions.** `RETRIEVAL_DOCUMENT` task type when embedding the catalog (batched, 20 per call, only for rows missing a vector); `RETRIEVAL_QUERY` when embedding a chef's search phrase.
+**Embedding model — `gemini-embedding-001`, 3072 dimensions.** `RETRIEVAL_DOCUMENT` task type when embedding the catalog (batched, 20 per call, only for rows missing a vector — `--rebuild` re-embeds everything); `RETRIEVAL_QUERY` when embedding a chef's search phrase. Each recipe is embedded as its title, its ingredient *names*, and its step instructions, so technique words are searchable.
 
 **Tool schemas — 8 `types.FunctionDeclaration`s** (`app/tools/registry.py`). Declarations expose only user-meaningful parameters; server context is injected at dispatch:
 
@@ -213,7 +213,7 @@ kitchen-assistant/
 │   └── recipes_seed.json          # Catalog source of truth
 ├── scripts/
 │   ├── ingest_recipes.py          # Seed JSON → DuckDB (idempotent, validating)
-│   ├── setup_vector_search.py     # Embed missing rows + build HNSW index
+│   ├── setup_vector_search.py     # Embed missing rows (--rebuild: all) + build HNSW index
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
@@ -309,6 +309,7 @@ The catalog ships pre-built in `data/recipes.db` (16 recipes, already embedded).
 ```bash
 poetry run python scripts/ingest_recipes.py       # validate + load the JSON catalog into DuckDB (idempotent)
 poetry run python scripts/setup_vector_search.py  # embed any rows missing a vector, build the HNSW index
+#                                        add --rebuild to re-embed every row (needed if the document text changes)
 ```
 
 `setup_vector_search.py` requires `GOOGLE_API_KEY`; `ingest_recipes.py` does not.
