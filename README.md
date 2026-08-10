@@ -64,7 +64,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
 - 96 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
-- GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
+- GitHub Actions CI running `poetry check --lock`, `ruff` and `pytest` across a 3.11/3.13 matrix, plus `oxlint` and a real frontend type-check + build.
 
 **Frontend**
 - React 19 + TypeScript (strict) + Vite + Tailwind + Zustand HUD, designed for glanceability across a room.
@@ -348,7 +348,8 @@ poetry run python scripts/eval_tool_calls.py   # tool-call accuracy over 11 labe
 ### Tests and lint
 
 ```bash
-poetry run pytest        # 96 tests; fakes the Live backend — no API key, no network
+poetry run pytest        # 101 tests; fakes the Live backend — no API key, no network
+poetry check --lock      # lockfile still matches pyproject
 poetry run ruff check .
 cd frontend && npm run lint && npm run build
 ```

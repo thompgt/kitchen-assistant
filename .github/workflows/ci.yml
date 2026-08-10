@@ -26,6 +26,9 @@ jobs:
       - name: Install Poetry
         run: pipx install poetry
 
+      - name: Check lockfile is in sync with pyproject
+        run: poetry check --lock
+
       - name: Install dependencies
         run: poetry install --no-interaction
 
@@ -47,6 +50,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Lint (oxlint)
+        working-directory: frontend
+        run: npm run lint
 
       - name: Build frontend (HUD)
         working-directory: frontend
