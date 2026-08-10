@@ -104,11 +104,13 @@ export function useVoiceSocket() {
     const sessionId = makeSessionId()
     // If the page was loaded with ?token=..., forward it to the WS route — lets a
     // deployer gate access with APP_AUTH_TOKEN by sharing "https://host/?token=...".
+    // It travels as a subprotocol, not a query param: WS URLs end up in proxy logs.
     const authToken = new URLSearchParams(location.search).get('token')
     const wsUrl =
-      `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/voice/${sessionId}` +
-      (authToken ? `?token=${encodeURIComponent(authToken)}` : '')
-    const ws = new WebSocket(wsUrl)
+      `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/voice/${sessionId}`
+    const wsProtocols = ['kitchen-assistant.v1']
+    if (authToken) wsProtocols.push(`kitchen-assistant.token.${authToken}`)
+    const ws = new WebSocket(wsUrl, wsProtocols)
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
 

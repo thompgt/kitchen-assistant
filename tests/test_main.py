@@ -15,16 +15,20 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 import app.main as main_module
+from app.auth import WS_SUBPROTOCOL
 from app.live.gateway import LiveGateway
 from tests.test_gateway import FakeLiveSession, _ConnectCM, make_message, make_tool_call
 
 
 @contextmanager
-def _websocket_session(path: str):
+def _websocket_session(path: str, token: str | None = None):
     """websocket_connect, tolerating the benign portal-teardown race where the
     fake session's blocked receive() is still being cancelled when TestClient's
     background ASGI thread winds down after the assertions already ran."""
-    cm = TestClient(main_module.app).websocket_connect(path)
+    subprotocols = [WS_SUBPROTOCOL]
+    if token is not None:
+        subprotocols.append(f"kitchen-assistant.token.{token}")
+    cm = TestClient(main_module.app).websocket_connect(path, subprotocols=subprotocols)
     ws = cm.__enter__()
     try:
         yield ws
@@ -119,6 +123,35 @@ def test_websocket_route_accepts_correct_token(monkeypatch) -> None:
 
     monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
 
-    with _websocket_session("/ws/voice/route-test-4?token=secret-123") as ws:
+    with _websocket_session("/ws/voice/route-test-4", token="secret-123") as ws:
         envelope = json.loads(ws.receive_text())
     assert envelope == {"type": "session.status", "status": "ready"}
+
+
+def test_websocket_route_ignores_a_token_in_the_query_string(monkeypatch) -> None:
+    """The URL is no longer a credential channel: proxies and logs capture it."""
+    monkeypatch.setenv("APP_AUTH_TOKEN", "secret-123")
+    session = FakeLiveSession(block_after=True)
+
+    def fake_factory(self) -> _ConnectCM:
+        return _ConnectCM(session)
+
+    monkeypatch.setattr(LiveGateway, "_default_connect_factory", fake_factory)
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with _websocket_session("/ws/voice/route-test-5?token=secret-123") as ws:
+            ws.receive_text()
+    assert exc_info.value.code == 4001
+
+
+def test_cors_is_not_a_credentialed_wildcard() -> None:
+    """allow_origins=["*"] with credentials is rejected by browsers anyway."""
+    assert "*" not in main_module.allowed_origins
+
+    client = TestClient(main_module.app)
+    allowed = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert allowed.headers["access-control-allow-credentials"] == "true"
+
+    denied = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in denied.headers

@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 91 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 94 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -219,7 +219,7 @@ kitchen-assistant/
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
-├── tests/                         # 91 pytest tests; fake Live backend, no network
+├── tests/                         # 94 pytest tests; fake Live backend, no network
 ├── notebooks/                     # EDA, multimodal practice, tool design, end-to-end demo
 ├── .gemini/skills/                # Authored skill specs behind scaling + timer tools
 ├── ARCHITECTURE.md  workplan.md  frontend_plan.md  CLAUDE.md
@@ -230,7 +230,7 @@ kitchen-assistant/
 
 ## How it works
 
-**1. Connect.** The browser opens `ws://host/ws/voice/{session_id}?token=…`. `app/main.py` accepts, checks the token against `APP_AUTH_TOKEN` (`hmac.compare_digest`; open access when unset) and closes with code `4001` if it fails. On success it constructs one `LiveGateway` for that connection — no conversation state is shared between clients.
+**1. Connect.** The browser opens `ws://host/ws/voice/{session_id}`, offering the subprotocols `kitchen-assistant.v1` and, when a token is in play, `kitchen-assistant.token.<value>`. `app/main.py` accepts with `kitchen-assistant.v1`, checks the token against `APP_AUTH_TOKEN` (`hmac.compare_digest`; open access when unset) and closes with code `4001` if it fails. The token never enters the URL, where proxies and access logs would capture it. On success it constructs one `LiveGateway` for that connection — no conversation state is shared between clients.
 
 **2. Open the model session.** The gateway calls its connect factory (`client.aio.live.connect`, or an injected fake in tests), registers a timer-expiry callback for the session, and sends `{"type":"session.status","status":"ready"}`. Two tasks then run concurrently until either finishes.
 
@@ -305,10 +305,11 @@ Copy `.env.example` to `.env` and fill it in. **Never commit `.env`.**
 | `RECIPES_DB_PATH` | DuckDB recipe database | `data/recipes.db` |
 | `RECIPE_MAX_DISTANCE` | Relevance floor for semantic search (Euclidean, 0–2) | `1.0` |
 | `APP_AUTH_TOKEN` | Shared token gating `/ws/voice/{session_id}` | unset (open access) |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins | app origin + Vite dev server |
 | `USE_REDIS` | Use Redis for session state instead of memory | `false` |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
 
-**Auth.** Open by default, which is fine on a trusted LAN. To gate it, set `APP_AUTH_TOKEN` and share the URL with the token attached — `https://host/?token=<value>` — which both clients forward to the WebSocket. This is one shared secret, not a user-account system: it is a single-deployment kitchen appliance, and concurrent users already get isolated state via `session_id` (ADR-009).
+**Auth.** Open by default, which is fine on a trusted LAN. To gate it, set `APP_AUTH_TOKEN` and share the *page* URL with the token attached — `https://host/?token=<value>` — which both clients read and forward to the WebSocket as a `kitchen-assistant.token.<value>` subprotocol rather than a query parameter. This is one shared secret, not a user-account system: it is a single-deployment kitchen appliance, and concurrent users already get isolated state via `session_id` (ADR-009).
 
 ### Recipe catalog
 
@@ -345,7 +346,7 @@ poetry run python scripts/eval_tool_calls.py   # tool-call accuracy over 11 labe
 ### Tests and lint
 
 ```bash
-poetry run pytest        # 91 tests; fakes the Live backend — no API key, no network
+poetry run pytest        # 94 tests; fakes the Live backend — no API key, no network
 poetry run ruff check .
 cd frontend && npm run lint && npm run build
 ```

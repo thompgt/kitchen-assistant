@@ -10,6 +10,21 @@ can't be used by strangers to burn your Gemini API quota.
 """
 import hmac
 import os
+from typing import List, Optional
+
+# The token rides in Sec-WebSocket-Protocol rather than the query string:
+# query strings land in proxy access logs and browser history, and the
+# WebSocket API gives no other way to attach a credential from a browser.
+WS_SUBPROTOCOL = "kitchen-assistant.v1"
+_TOKEN_PREFIX = "kitchen-assistant.token."
+
+
+def token_from_subprotocols(subprotocols: Optional[List[str]]) -> Optional[str]:
+    """Pull the auth token out of the offered WebSocket subprotocols."""
+    for offered in subprotocols or []:
+        if offered.startswith(_TOKEN_PREFIX):
+            return offered[len(_TOKEN_PREFIX):] or None
+    return None
 
 
 def auth_enabled() -> bool:
