@@ -63,7 +63,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 
 **Typed contracts & testing**
 - Pydantic v2 as the single source of truth (`app/schemas.py`), mirrored into TypeScript interfaces on the client.
-- 83 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
+- 84 `pytest` / `pytest-asyncio` tests, including a **fake Live backend injected through a connect-factory constructor argument** — the gateway's reconnect, tool-dispatch and barge-in paths are all tested with no API key and no network.
 - GitHub Actions CI running `ruff`, `pytest`, and a real frontend type-check + build.
 
 **Frontend**
@@ -238,7 +238,7 @@ kitchen-assistant/
 
 **5. Tool calls.** When the model emits a `tool_call`, the gateway hands each function call to `ToolRegistry.dispatch(session_id, name, args)`. The registry inspects the target function's signature and injects whichever of `state_manager`, `session_id`, `timer_engine`, `recipe_store` it declares — none of which the model can see or forge. Results go back as `types.FunctionResponse`, and the gateway follows up with a `state.snapshot` so the UI updates in lockstep with what the assistant is about to say.
 
-**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
+**6. What the tools actually do.** `set_kitchen_timer` writes a `KitchenTimer` into state *and* starts a real `asyncio` countdown. `search_recipes` embeds the query and runs `array_distance` over DuckDB in a worker thread. `load_recipe` hydrates `RecipeState.recipe_metadata`, which is what gives `navigate_steps` real steps to clamp against and read back. `scale_recipe` recomputes actual ingredient amounts, and a multiplier set before any recipe is loaded survives the load and is applied to it. `convert_units` normalizes aliases and case, and refuses mass↔volume rather than guessing a density.
 
 **7. Proactive timer expiry.** When a countdown finishes, `TimerEngine` marks the timer inactive in state, then invokes the gateway's registered callback. The gateway sends `timer.expired` plus a fresh `state.snapshot` to the browser *and* injects a system turn into the Live session — so the assistant announces the timer out loud even though nobody asked it anything. Countdowns are cancelled when the session ends.
 

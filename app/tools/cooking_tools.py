@@ -10,9 +10,9 @@ Every tool returns a JSON-serializable dict with a "status" key:
 """
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from ..schemas import KitchenTimer, RecipeState
+from ..schemas import KitchenTimer, RecipeMetadata, RecipeState
 from ..services.recipe_store import RecipeStore
 from ..services.timer_engine import TimerEngine
 from ..state_manager import StateManager
@@ -47,6 +47,17 @@ def _error(message: str) -> Dict[str, Any]:
 def _normalize_unit(unit: str) -> str:
     cleaned = unit.strip().lower()
     return _UNIT_ALIASES.get(cleaned, cleaned)
+
+
+def _scaled_ingredients(recipe: RecipeMetadata, multiplier: float) -> List[Dict[str, Any]]:
+    return [
+        {
+            "name": ingredient.name,
+            "amount": round(ingredient.amount * multiplier, 2),
+            "unit": ingredient.unit,
+        }
+        for ingredient in recipe.ingredients
+    ]
 
 
 async def set_kitchen_timer(
@@ -216,14 +227,7 @@ async def scale_recipe(
 
     result: Dict[str, Any] = {"status": "success", "new_multiplier": multiplier}
     if state.recipe_metadata is not None:
-        result["scaled_ingredients"] = [
-            {
-                "name": ingredient.name,
-                "amount": round(ingredient.amount * multiplier, 2),
-                "unit": ingredient.unit,
-            }
-            for ingredient in state.recipe_metadata.ingredients
-        ]
+        result["scaled_ingredients"] = _scaled_ingredients(state.recipe_metadata, multiplier)
     else:
         result["note"] = "No recipe loaded; multiplier stored and applied once one is loaded."
     return result
@@ -265,6 +269,8 @@ async def load_recipe(
 
     Returns:
         The loaded recipe's title and first instruction, or a structured error.
+        If a scaling multiplier is already set it stays in force and the scaled
+        ingredient amounts come back with the recipe.
     """
     recipe = await recipe_store.get_recipe(recipe_id)
     if recipe is None:
@@ -274,16 +280,22 @@ async def load_recipe(
         state.recipe_id = recipe.id
         state.recipe_metadata = recipe
         state.current_step_index = 0
-        state.servings_multiplier = 1.0
+        # servings_multiplier is deliberately preserved: the chef scales for the
+        # number of covers, not per recipe, and scale_recipe promises the stored
+        # multiplier is applied once a recipe loads.
 
-    await state_manager.update(session_id, _load)
-    return {
+    state = await state_manager.update(session_id, _load)
+    result: Dict[str, Any] = {
         "status": "success",
         "recipe_id": recipe.id,
         "title": recipe.title,
         "total_steps": len(recipe.steps),
         "first_instruction": recipe.steps[0].instruction if recipe.steps else None,
     }
+    if state.servings_multiplier != 1.0:
+        result["servings_multiplier"] = state.servings_multiplier
+        result["scaled_ingredients"] = _scaled_ingredients(recipe, state.servings_multiplier)
+    return result
 
 
 async def navigate_steps(
