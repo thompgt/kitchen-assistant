@@ -209,15 +209,14 @@ kitchen-assistant/
 │       └── components/                # StatusBar, InstructionCard, IngredientChecklist,
 │                                      # ActiveTimerBoard, TranscriptPane, CameraPreview, MicButton
 ├── data/
-│   ├── recipes.db                 # DuckDB catalog (16 recipes, embedded)
-│   └── recipes_seed.json          # Catalog source of truth
+│   └── recipes_seed.json          # Catalog source of truth (recipes.db is built from it)
 ├── scripts/
 │   ├── ingest_recipes.py          # Seed JSON → DuckDB (idempotent, validating)
 │   ├── setup_vector_search.py     # Embed missing rows (--rebuild: all) + build HNSW index
 │   ├── live_smoke.py              # One real round-trip through Gemini Live
 │   ├── render_architecture.py     # Regenerate assets/architecture.png
 │   └── capture_screenshots.py     # Regenerate assets/screenshots/
-├── tests/                         # 80 pytest tests; fake Live backend, no network
+├── tests/                         # 87 pytest tests; fake Live backend, no network
 ├── notebooks/                     # EDA, multimodal practice, tool design, end-to-end demo
 ├── .gemini/skills/                # Authored skill specs behind scaling + timer tools
 ├── ARCHITECTURE.md  workplan.md  frontend_plan.md  CLAUDE.md
@@ -264,6 +263,11 @@ cd kitchen-assistant
 
 poetry install
 cp .env.example .env          # then fill in GOOGLE_API_KEY — see the table below
+
+# Build the recipe catalog (derived, not committed — see Recipe catalog below)
+poetry run python scripts/ingest_recipes.py
+poetry run python scripts/setup_vector_search.py
+
 poetry run uvicorn app.main:app --reload
 ```
 
@@ -305,7 +309,7 @@ Copy `.env.example` to `.env` and fill it in. **Never commit `.env`.**
 
 ### Recipe catalog
 
-The catalog ships pre-built in `data/recipes.db` (16 recipes, already embedded). To rebuild it or add recipes, edit `data/recipes_seed.json` and run:
+`data/recipes.db` is a derived artifact and is not committed — `data/recipes_seed.json` is the source of truth. Build it once after cloning, and again whenever you edit the seed:
 
 ```bash
 poetry run python scripts/ingest_recipes.py       # validate + load the JSON catalog into DuckDB (idempotent)

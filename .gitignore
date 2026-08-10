@@ -12,6 +12,8 @@ venv/
 app/venv/
 
 # Data & artifacts
+# recipes.db is derived from data/recipes_seed.json: see README, Recipe catalog
+*.db
 *.duckdb.wal
 .pytest_cache/
 .ruff_cache/
