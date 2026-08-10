@@ -9,12 +9,19 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the supported range in pyproject (>=3.11,<3.14): 3.11 is
+        # what the Dockerfile runtime ships, 3.13 is what notebooks are executed
+        # under. Testing both keeps the declared range from being a guess.
+        python-version: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
         run: pipx install poetry
@@ -27,6 +34,11 @@ jobs:
 
       - name: Test (pytest)
         run: poetry run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:

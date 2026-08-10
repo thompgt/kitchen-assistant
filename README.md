@@ -71,7 +71,7 @@ It is also a deliberate exercise in the hard parts of production realtime AI: st
 - A second, **build-free vanilla JS client** speaking the byte-identical WebSocket protocol — proof the server contract is genuinely client-agnostic.
 
 **Packaging & ops**
-- Poetry-managed Python 3.11+, multi-stage Dockerfile (Node stage builds the HUD, Python stage runs it), Docker Compose with an opt-in Redis profile, non-root container user and a `HEALTHCHECK`.
+- Poetry-managed Python 3.11–3.13 (both ends tested in CI), multi-stage Dockerfile (Node stage builds the HUD, Python stage runs it), Docker Compose with an opt-in Redis profile, non-root container user and a `HEALTHCHECK`.
 - Shared-token WebSocket auth using `hmac.compare_digest`, with a documented rationale for why full user accounts would be the wrong solution here.
 
 ---
@@ -253,7 +253,9 @@ kitchen-assistant/
 ## How to run
 
 ### Prerequisites
-- **Python 3.11+** and [Poetry](https://python-poetry.org/)
+- **Python 3.11–3.13** and [Poetry](https://python-poetry.org/) — notebooks must be
+  executed under the project's Poetry env so committed outputs match a runtime the
+  lockfile actually describes
 - A **Google AI (Gemini) API key** with Live API access ([aistudio.google.com/apikey](https://aistudio.google.com/apikey))
 - **Node.js 22+** — only needed to build the React HUD (CI and the Dockerfile use Node 22)
 - Optional: Docker, for the containerized path

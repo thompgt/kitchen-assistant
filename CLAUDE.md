@@ -29,7 +29,8 @@ The phased roadmap is [`workplan.md`](workplan.md) — follow it, commit in smal
 - `frontend/` — React/TS/Tailwind/Zustand HUD (Phase 7), served at `/hud` once built
 
 ## Technical Standards
-- Language: Python 3.11+, Poetry-managed
+- Language: Python 3.11–3.13 (`>=3.11,<3.14`), Poetry-managed. Run notebooks with the
+  project's Poetry env (`poetry run jupyter lab`) — never a system interpreter.
 - Async: Native `async/await` for the Live gateway, orchestration, and tool execution.
 - Latency: Optimized for <800ms Glass-to-Glass (budget in ARCHITECTURE.md).
 - State: Pydantic schemas in `app/schemas.py`, session persistence in `app/state_manager.py`.
