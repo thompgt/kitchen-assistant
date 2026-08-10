@@ -8,7 +8,7 @@ embedding-document change requires.
 import argparse
 import json
 import os
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import duckdb
 from dotenv import load_dotenv
@@ -21,13 +21,27 @@ DB_PATH = os.getenv("RECIPES_DB_PATH", "data/recipes.db")
 EMBEDDING_MODEL = "gemini-embedding-001"
 BATCH_SIZE = 20
 
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+_client: Optional[Any] = None
 
 
-def get_embeddings(texts: List[str]) -> List[List[float]]:
+def get_client() -> Any:
+    """Build the embedding client on first use.
+
+    Importing this module must not require an API key — a module-level
+    `genai.Client(...)` made the script unimportable without one, which is why
+    it had no unit tests while the sibling ingest script does. Same lazy shape
+    as `app.services.recipe_store.RecipeStore._get_client`.
+    """
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    return _client
+
+
+def get_embeddings(texts: List[str], client: Optional[Any] = None) -> List[List[float]]:
     if not texts:
         return []
-    response = client.models.embed_content(
+    response = (client or get_client()).models.embed_content(
         model=EMBEDDING_MODEL,
         contents=texts,
         config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
@@ -54,7 +68,11 @@ def build_document(title: str, ingredients_json: str, steps_json: str) -> str:
     return f"{title}. Ingredients: {names}. Steps: {instructions}"
 
 
-def setup_vector_db(db_path: str = DB_PATH, rebuild: bool = False) -> int:
+def setup_vector_db(
+    db_path: str = DB_PATH,
+    rebuild: bool = False,
+    client: Optional[Any] = None,
+) -> int:
     con = duckdb.connect(db_path)
 
     print("Installing DuckDB VSS extension...")
@@ -84,7 +102,7 @@ def setup_vector_db(db_path: str = DB_PATH, rebuild: bool = False) -> int:
                 build_document(title, ingredients, steps)
                 for _, title, ingredients, steps in batch
             ]
-            vectors = get_embeddings(texts)
+            vectors = get_embeddings(texts, client=client)
             for (recipe_id, title, _, _), vector in zip(batch, vectors):
                 con.execute("UPDATE recipes SET embedding = ? WHERE id = ?", [vector, recipe_id])
                 print(f"  embedded: {title}")
